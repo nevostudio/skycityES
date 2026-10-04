@@ -13,6 +13,13 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 - Edificios iniciales: 6 públicos (SkyCity HQ, NevoStudio, Ayuntamiento, Estación Central, Museo y Biblioteca) y, solo en demo, 4 marcas ficticias (Nova Labs, Pixel Coffee, Green Market y Moonlight Club).
 - Migración versionada (`plotsVersion`, `lib/plots.ts`): los leases activos pasan a edificios construidos y permanentes; los solares libres quedan vacíos; los anuncios demo sobrantes se retiran (marcados, no borrados). Usuarios, transacciones, pujas, subastas y analítica no cambian. En Postgres, aplica `supabase/migrations/20261004190000_plots_buildings.sql` con `npm run db:migrate`.
 
+## Escaparate y legibilidad
+
+- La home abre sobre un **escaparate curado** (`lib/showcase.ts`): la primera línea del Centro frente al bulevar, unas 15–25 parcelas a 1920×1080, con HQ y la Torre Central como skyline. El resto de la ciudad sigue disponible con arrastre y zoom; «Restablecer cámara» vuelve al escaparate.
+- El bulevar (entre Centro y Zona Residencial) tiene calzadas más anchas, mediana arbolada y farolas dobles.
+- En ciudades nuevas, NevoStudio, Pixel Coffee, Moonlight Club y Green Market están en primera línea, con Nova Labs detrás. Las alturas bajan hacia el lado de la cámara para que ningún edificio tape el cartel de otro, y hay solares libres entre ellos. Las ciudades existentes no mueven ningún edificio.
+- Jerarquía visual: edificios con marca (tinte de su color, contorno, pilastra de acento y cartel grande) → edificios públicos y premium → calles → solares libres. Los solares son discretos y solo destacan al pasar el ratón o con el filtro «Solares libres».
+
 ## Marca y carteles de azotea (fase 2)
 
 - Cada edificio comprado muestra su marca con un **cartel físico en la azotea** (postes, marco y cara con textura): logo, nombre y frase corta opcional. El nombre aparece una sola vez; si el logo es horizontal, sustituye al nombre.

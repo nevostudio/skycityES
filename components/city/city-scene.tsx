@@ -9,6 +9,7 @@ import type { District, PublicProperty } from "@/types";
 import { euro, siteNote } from "@/lib/client";
 import { FLOOR_HEIGHT, GROUND_FLOOR_HEIGHT } from "@/lib/presence";
 import { signLimits } from "@/lib/branding";
+import { AVENUE, SHOWCASE, showcaseZoom } from "@/lib/showcase";
 
 import {
   Building,
@@ -122,13 +123,17 @@ function Details({
       for (let i = 0; i < 14; i++) {
         const x = d.x - 15 + (i % 7) * 5;
         const z = d.z + (i < 7 ? -14 : 14);
+        // Keep the showcase front row clear: lighter trees along the boulevard.
+        const front = Math.abs(z - AVENUE.z) < 5;
         a.push({
-          p: [x, 2, z],
-          s: [1.1, 1.7, 1.1],
+          p: [x, front ? 1.5 : 2, z],
+          s: front ? [0.7, 1.1, 0.7] : [1.1, 1.7, 1.1],
           c: districtStyle(d.id).trees,
         });
       }
     });
+    for (let x = AVENUE.from + 2.5; x <= AVENUE.to - 2.5; x += 3.6)
+      a.push({ p: [x, 1.55, AVENUE.z], s: [0.75, 1.15, 0.75], c: "#6f9a63" });
     for (let i = 0; i < 38; i++)
       a.push({
         p: [-48 + (i % 8) * 3, 1.8, 32 + Math.floor(i / 8) * 4],
@@ -196,6 +201,66 @@ function windowColor(p: PublicProperty) {
         : districtStyle(p.districtId).glass;
 }
 const noConstruction: Record<string, Construction> = {};
+/** The showcase avenue: wider carriageways, a planted median and paired lamps. */
+function Boulevard() {
+  const length = AVENUE.to - AVENUE.from;
+  return (
+    <group name="boulevard">
+      <Block
+        position={[0, 0.186, AVENUE.z]}
+        scale={[length + 4, 0.135, AVENUE.width]}
+        color={palette.road}
+      />
+      {[-1, 1].map((side) =>
+        Array.from({ length: 9 }, (_, i) => (
+          <Block
+            key={`${side}:${i}`}
+            position={[AVENUE.from + 2 + i * 4, 0.27, AVENUE.z + side * 1.9]}
+            scale={[1.8, 0.025, 0.12]}
+            color={palette.line}
+          />
+        )),
+      )}
+      <Block
+        position={[0, 0.3, AVENUE.z]}
+        scale={[length - 1, 0.2, 1.5]}
+        color="#dcd8c7"
+      />
+      <Block
+        position={[0, 0.36, AVENUE.z]}
+        scale={[length - 1.4, 0.14, 1.1]}
+        color="#9fbb8a"
+      />
+      {Array.from({ length: 5 }, (_, i) => AVENUE.from + 4.3 + i * 7.2).map(
+        (x) => (
+          <group key={x} position={[x, 0, AVENUE.z]}>
+            <Block
+              position={[0, 1.6, 0]}
+              scale={[0.1, 2.6, 0.1]}
+              color="#6b7a74"
+            />
+            <Block
+              position={[0, 2.9, 0]}
+              scale={[0.08, 0.08, 1.3]}
+              color="#6b7a74"
+            />
+            {[-1, 1].map((side) => (
+              <mesh key={side} position={[0, 2.82, side * 0.62]}>
+                <boxGeometry args={[0.3, 0.12, 0.24]} />
+                <meshBasicMaterial color="#fbe7b5" toneMapped={false} />
+              </mesh>
+            ))}
+          </group>
+        ),
+      )}
+      <Block
+        position={[0, 0.36, AVENUE.z - AVENUE.width / 2 - 0.55]}
+        scale={[length - 2, 0.06, 0.9]}
+        color="#e9dfc8"
+      />
+    </group>
+  );
+}
 function tooltipLine(p: PublicProperty) {
   if (p.inventory === "skyscraper" && !p.building) {
     const note = siteNote(p).toLowerCase();
@@ -286,8 +351,8 @@ function Camera({
     zoomTo: number;
     elapsed: number;
   } | null>(null);
-  const x = selected?.x ?? focus?.x ?? -17,
-    z = selected?.z ?? focus?.z ?? 14,
+  const x = selected?.x ?? focus?.x ?? SHOWCASE.x,
+    z = selected?.z ?? focus?.z ?? SHOWCASE.z,
     h = selected?.height ?? 0,
     id = selected?.id;
   useEffect(() => {
@@ -308,19 +373,31 @@ function Camera({
       destination.current = null;
       return;
     }
+    const zoomTo = id
+      ? size.width < 600
+        ? 26
+        : Math.min(46, size.height / (h * 0.9 + 7))
+      : focus
+        ? size.width < 600
+          ? 17
+          : 29
+        : showcaseZoom(size.width, size.height);
+    const to = new THREE.Vector3(x, id ? h * 0.48 : focus ? 2 : SHOWCASE.y, z);
+    if (old.reset === -1 && !id && !focus) {
+      // First view: start already framed on the showcase instead of sweeping across the map.
+      camera.position.add(to.clone().sub(c.target));
+      c.target.copy(to);
+      camera.zoom = zoomTo;
+      camera.updateProjectionMatrix();
+      c.update();
+      destination.current = null;
+      return;
+    }
     destination.current = {
       from: c.target.clone(),
-      to: new THREE.Vector3(x, id ? h * 0.48 : 2, z),
+      to,
       zoomFrom: camera.zoom,
-      zoomTo: id
-        ? size.width < 600
-          ? 26
-          : Math.min(41, size.height / (h * 0.9 + 8))
-        : size.width < 600
-          ? 17
-          : focus
-            ? 29
-            : 27,
+      zoomTo,
       elapsed: 0,
     };
   }, [x, z, h, id, focus?.id, resetKey, size.width, size.height, camera]);
@@ -382,6 +459,7 @@ export default function CityScene({
   zoomAction,
   resetKey,
   constructing = noConstruction,
+  highlightPlots = false,
   onBuilt,
 }: {
   properties: PublicProperty[];
@@ -393,6 +471,8 @@ export default function CityScene({
   zoomAction: number;
   resetKey: number;
   constructing?: Record<string, Construction>;
+  /** "Solares libres" filter: empty plots step forward. */
+  highlightPlots?: boolean;
   onBuilt?: (id: string) => void;
 }) {
   const [hover, setHover] = useState<PublicProperty | null>(null);
@@ -453,7 +533,13 @@ export default function CityScene({
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
       orthographic
-      camera={{ position: [93, 107, 139], zoom: 27, near: 0.1, far: 650 }}
+      camera={{
+        // Offset from the orbit target; the first frame snaps it onto the showcase.
+        position: [93, 107, 139],
+        zoom: 40,
+        near: 0.1,
+        far: 650,
+      }}
       dpr={[1, 1.6]}
       gl={{
         antialias: true,
@@ -463,7 +549,8 @@ export default function CityScene({
       onPointerMissed={() => setHover(null)}
     >
       <color attach="background" args={["#e7e9df"]} />
-      <fog attach="fog" args={["#e7e9df", 210, 380]} />
+      {/* A soft haze on far districts gives depth to the curated first view. */}
+      <fog attach="fog" args={["#e7e9df", 225, 340]} />
       <ambientLight intensity={1.1} />
       <hemisphereLight args={["#f4f6e6", "#72886a", 1]} />
       <directionalLight
@@ -560,6 +647,7 @@ export default function CityScene({
           ))}
         </group>
       ))}
+      <Boulevard />
       <Details
         properties={built}
         districts={districts}
@@ -570,6 +658,7 @@ export default function CityScene({
       <PlotField
         plots={plots}
         muted={mutedPlots}
+        emphasis={highlightPlots}
         onSelect={onSelect}
         onHover={setHover}
       />
@@ -604,8 +693,9 @@ export default function CityScene({
       <Car offset={5} color="#e4a178" />
       <Car offset={39} color="#f1eee3" lane={-11.2} speed={-0.7} />
       <Car offset={71} color="#7b9698" axis="z" lane={-18.8} speed={0.72} />
-      <Car offset={99} color="#d2b76f" lane={23.2} speed={0.6} />
-      <Car offset={30} color="#96af95" lane={24.8} speed={-0.8} />
+      <Car offset={99} color="#d2b76f" lane={AVENUE.z - 1.9} speed={0.6} />
+      <Car offset={30} color="#96af95" lane={AVENUE.z + 1.9} speed={-0.8} />
+      <Car offset={58} color="#e4a178" lane={AVENUE.z + 1.9} speed={-0.55} />
       <Car offset={67} color="#dbc5ab" axis="z" lane={18.8} speed={-0.65} />
       {hover && hover.id !== selected && (
         <Html

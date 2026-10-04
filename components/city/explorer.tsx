@@ -257,6 +257,7 @@ export function Explorer({
               zoomAction={zoom}
               resetKey={reset}
               constructing={constructing}
+              highlightPlots={filter === "Disponibles"}
               onBuilt={built}
             />
           </div>
@@ -285,11 +286,18 @@ export function Explorer({
               <button className="intro-claim" onClick={findSpot}>
                 Elegir mi solar <ArrowUpRight size={16} />
               </button>
-              <small>
-                {data.stats.built} edificios construidos ·{" "}
-                {data.stats.available} solares libres · Pago único, sin
-                registro.
-              </small>
+              <ul className="intro-legend" aria-label="Leyenda del mapa">
+                <li>
+                  <i className="legend-brand" />
+                  {data.stats.privateBuilt} marcas ya han construido
+                </li>
+                <li>
+                  <i className="legend-plot" />
+                  {data.stats.available} solares libres desde{" "}
+                  {euro(cheapest?.price ?? 3)}
+                </li>
+              </ul>
+              <small>Pago único, sin registro.</small>
             </section>
           )}
           <div className="map-toolbar">

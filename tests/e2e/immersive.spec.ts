@@ -27,7 +27,7 @@ test("fullscreen city: plots, brands, focus, neighborhoods, filters and navigati
   await page
     .locator(".directory-grid button")
     .filter({ hasText: "Nova Labs" })
-    .filter({ hasText: "#13" })
+    .first()
     .click();
   const panel = page.getByRole("complementary", {
     name: "Solar seleccionado",

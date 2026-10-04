@@ -98,7 +98,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
         color: palettes[(i + di) % palettes.length],
         price: sky ? SKYSCRAPER_PRICE : 3,
         sale: sky?.auction ? "auction" : "rental",
-        featured: [3, 14, 73, 154].includes(n),
+        featured: [14, 21, 25, 26, 28, 30, 154].includes(n),
         enabled: true,
         inventory: sky ? "skyscraper" : "normal",
         ...(sky && !sky.auction

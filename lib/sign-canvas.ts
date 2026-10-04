@@ -217,7 +217,7 @@ export function drawRooftopSign(
     tw = W - pad - tx;
   c.textAlign = "left";
   c.fillStyle = ink;
-  const size = fit(c, name, tw, tagline ? h * 0.52 : h * 0.66, h * 0.24, "800");
+  const size = fit(c, name, tw, tagline ? h * 0.58 : h * 0.72, h * 0.26, "800");
   c.fillText(name, tx, tagline ? y0 + h * 0.5 : y0 + h / 2 + size * 0.36, tw);
   if (tagline) {
     c.globalAlpha = 0.8;

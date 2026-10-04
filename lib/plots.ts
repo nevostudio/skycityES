@@ -44,7 +44,10 @@ export const NEVOSTUDIO_BRANDING: Ad = {
   support: "PARTIAL_FACADE",
   status: "active",
 };
-/** City-owned buildings standing from day one. They have no owner or lease. */
+/**
+ * City-owned buildings standing from day one. They have no owner or lease.
+ * NevoStudio anchors the showcase avenue; HQ rises behind it as part of the skyline.
+ */
 export const PUBLIC_BUILDINGS: {
   number: number;
   name: string;
@@ -54,16 +57,16 @@ export const PUBLIC_BUILDINGS: {
   branding?: Ad;
 }[] = [
   {
-    number: 3,
+    number: 4,
     name: "SkyCity HQ",
     tier: "LANDMARK",
     color: "#e9dfca",
     description: "La sede de SkyCity. Aquí empezó la ciudad.",
   },
   {
-    number: 73,
+    number: 25,
     name: "NevoStudio",
-    tier: "PREMIUM",
+    tier: "LANDMARK",
     color: "#e9e7e1",
     description: "El estudio que diseña y construye SkyCity.",
     branding: NEVOSTUDIO_BRANDING,
@@ -98,7 +101,12 @@ export const PUBLIC_BUILDINGS: {
   },
 ];
 
-/** Fictional brands kept as a small, clearly labeled showcase in demo mode. */
+/**
+ * Fictional brands kept as a small, clearly labeled showcase in demo mode, placed along the
+ * showcase avenue (downtown front row, facing the boulevard) so they read from the first view.
+ * Heights step down towards the camera side (+x) so no tall building hides a neighbour's sign,
+ * with free plots in between to invite a purchase.
+ */
 export const DEMO_SHOWCASE: {
   number: number;
   brand: string;
@@ -107,11 +115,11 @@ export const DEMO_SHOWCASE: {
   tagline: string;
 }[] = [
   {
-    number: 13,
-    brand: "Nova Labs",
-    tier: "PRO",
-    primary: "#648688",
-    tagline: "Ideas que despegan",
+    number: 30,
+    brand: "Green Market",
+    tier: "PLUS",
+    primary: "#73966f",
+    tagline: "Del huerto a tu mesa",
   },
   {
     number: 26,
@@ -121,20 +129,22 @@ export const DEMO_SHOWCASE: {
     tagline: "Café de especialidad",
   },
   {
-    number: 52,
-    brand: "Green Market",
-    tier: "STARTER",
-    primary: "#73966f",
-    tagline: "Del huerto a tu mesa",
-  },
-  {
-    number: 65,
+    number: 28,
     brand: "Moonlight Club",
-    tier: "PLUS",
+    tier: "PRO",
     primary: "#b08499",
     tagline: "Música hasta el amanecer",
   },
+  {
+    number: 21,
+    brand: "Nova Labs",
+    tier: "PREMIUM",
+    primary: "#648688",
+    tagline: "Ideas que despegan",
+  },
 ];
+/** Seed leases kept when a pre-phase-1 city (16 fictional ads) was migrated. */
+export const LEGACY_SHOWCASE = [13, 26, 52, 65];
 export const DEMO_DESCRIPTION =
   "Una idea independiente con su sitio en la ciudad. Marca ficticia de demostración.";
 export const isShowcaseAd = (ad: Ad) =>
@@ -250,7 +260,7 @@ export function migratePlots(s: State) {
   const settings = s.settings[0];
   if (settings.plotsVersion === 1) return s;
   applyDistrictNames(s.districts);
-  const showcase = new Set(DEMO_SHOWCASE.map((d) => `seed-lease-${d.number}`));
+  const showcase = new Set(LEGACY_SHOWCASE.map((n) => `seed-lease-${n}`));
   for (const l of s.leases) {
     if (
       l.status === "active" &&
@@ -349,13 +359,18 @@ export function migrateBranding(s: State) {
   };
   for (const l of s.leases) {
     upgrade(l.ad);
-    const demo = DEMO_SHOWCASE.find((d) => `seed-lease-${d.number}` === l.id);
+    const demo =
+      l.id.startsWith("seed-lease-") &&
+      DEMO_SHOWCASE.find((d) => d.brand === l.ad.brand);
     if (demo && isShowcaseAd(l.ad) && !l.ad.tagline)
       l.ad.tagline = demo.tagline;
   }
   for (const r of s.reservations) upgrade(r.ad);
   for (const def of PUBLIC_BUILDINGS) {
-    const p = s.properties.find((p) => p.number === def.number);
+    // Matched by name: older cities placed these buildings on other plots.
+    const p = s.properties.find(
+      (p) => p.inventory === "public" && p.name === def.name,
+    );
     const b = p && s.buildings.find((b) => b.propertyId === p.id);
     if (def.branding && b?.kind === "public" && !b.branding)
       b.branding = structuredClone(def.branding);

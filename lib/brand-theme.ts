@@ -87,7 +87,7 @@ export function brandTheme(ad: Ad) {
     : {
         accent: ad.primary,
         // Walls take a light tint of the brand color; the pure color goes to the accents.
-        background: tint(ad.primary, 0.32),
+        background: tint(ad.primary, 0.45),
         ink: ad.secondary,
       };
 }

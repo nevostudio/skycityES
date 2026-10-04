@@ -359,6 +359,16 @@ export const Building = memo(function Building({
       <group ref={growth} scale={[1, construction ? 0.002 : 1, 1]}>
         <Block position={[0, h / 2, 0]} scale={[w, h, d]} color={color} />
         <PresenceArchitecture p={p} />
+        {/* Owned buildings get a crisp contour so they lead the image over the grid. */}
+        {p.ad && !muted && !faded && (
+          <lineSegments
+            geometry={outline}
+            position={[0, h / 2, 0]}
+            scale={[w + 0.02, h + 0.02, d + 0.02]}
+          >
+            <lineBasicMaterial color="#25342e" transparent opacity={0.55} />
+          </lineSegments>
+        )}
         {(selected || hover) && (
           <lineSegments
             geometry={outline}

@@ -7,6 +7,7 @@ import { PRESENCE_TIERS } from "../lib/presence";
 import {
   ROOFTOP_SIGN,
   SIGN_YAW,
+  SIGN_ROOF_RATIO,
   effectiveSupport,
   signLimits,
   signSize,
@@ -47,7 +48,7 @@ test("rooftop signs grow with the tier: STARTER < PLUS < PRO < PREMIUM < LANDMAR
   assert.equal(ROOFTOP_SIGN.LANDMARK.lit, true);
   assert.equal(ROOFTOP_SIGN.PRO.lit, false);
   // Never much wider than the roof it stands on.
-  assert.ok(signSize("LANDMARK", 2.7).width <= 2.7 * 1.3 + 1e-9);
+  assert.ok(signSize("LANDMARK", 2.7).width <= 2.7 * SIGN_ROOF_RATIO + 1e-9);
 });
 
 test("signs never overlap their neighbours: each one keeps to half the gap", () => {
@@ -226,13 +227,14 @@ test("branding persists with the building and survives upgrades; migration is ad
   // Legacy ads gain the new fields without losing anything else.
   const legacy = makeSeed(true, now);
   legacy.settings[0].brandingVersion = undefined;
-  const ad = legacy.leases[0].ad as Partial<typeof emptyAd>;
+  const nova = legacy.leases.find((l) => l.ad.brand === "Nova Labs")!;
+  const ad = nova.ad as Partial<typeof emptyAd>;
   delete ad.tagline;
   delete ad.support;
   ad.style = "facade";
-  const before = structuredClone(legacy.leases[0].ad);
+  const before = structuredClone(nova.ad);
   migrateBranding(legacy);
-  const after = legacy.leases[0].ad;
+  const after = nova.ad;
   assert.equal(after.support, "PARTIAL_FACADE");
   assert.equal(after.tagline, "Ideas que despegan");
   for (const k of ["brand", "logo", "primary", "website"] as const)

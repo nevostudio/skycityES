@@ -62,11 +62,17 @@ function write(
 export function PlotField({
   plots,
   muted,
+  emphasis = false,
   onSelect,
   onHover,
 }: {
   plots: PublicProperty[];
   muted: Set<string>;
+  /**
+   * Empty plots stay quiet so built brands lead the image; they only stand out with the
+   * "Solares libres" filter (and individually on hover).
+   */
+  emphasis?: boolean;
   onSelect: (p: PublicProperty) => void;
   onHover: (p: PublicProperty | null) => void;
 }) {
@@ -83,52 +89,74 @@ export function PlotField({
     for (const p of plots) {
       const off = muted.has(p.id),
         reserved = p.status === "reserved",
+        loud = emphasis && !off,
         r = p.rotation;
       curbs.push({
         m: {
           x: p.x,
-          y: 0.37,
+          y: loud ? 0.37 : 0.35,
           z: p.z,
           sx: p.width + 0.5,
-          sy: 0.1,
+          sy: loud ? 0.1 : 0.06,
           sz: p.depth + 0.5,
         },
-        c: off ? "#d6d8ce" : "#e6e1d2",
+        c: off ? "#d9dbd1" : loud ? "#e6e1d2" : "#e1ddd0",
         r,
       });
       soils.push({
         m: {
           x: p.x,
-          y: 0.42,
+          y: loud ? 0.42 : 0.38,
           z: p.z,
           sx: p.width + 0.1,
-          sy: 0.12,
+          sy: loud ? 0.12 : 0.06,
           sz: p.depth + 0.1,
         },
-        c: off ? "#cfd2c6" : reserved ? "#ab9670" : "#c9b48c",
+        c: off
+          ? "#d3d5ca"
+          : reserved
+            ? "#b7a580"
+            : loud
+              ? "#c9b48c"
+              : "#d8cfb9",
         r,
       });
       for (const [cx, cz] of corners) {
         const at = local(p, cx * (p.width / 2 + 0.1), cz * (p.depth / 2 + 0.1));
         posts.push({
-          m: { ...at, y: 0.66, sx: 0.07, sy: 0.5, sz: 0.07 },
+          // Survey stakes only appear when plots are highlighted (or reserved).
+          m:
+            loud || reserved
+              ? { ...at, y: 0.66, sx: 0.07, sy: 0.5, sz: 0.07 }
+              : { ...at, y: 0.3, sx: 0.001, sy: 0.001, sz: 0.001 },
           c: off ? "#c4c7bd" : reserved ? "#e2bb4f" : "#e28a4f",
           r,
         });
       }
       // Available: a small "+" drawn on the soil. Reserved: foundation footings already laid.
-      const bar = reserved ? [p.width * 0.8, 0.14, 0.2] : [0.95, 0.04, 0.22];
-      const color = off ? "#c3c7bb" : reserved ? "#a6a499" : "#6f9a6a";
+      const bar = reserved
+        ? [p.width * 0.8, 0.14, 0.2]
+        : loud
+          ? [0.95, 0.04, 0.22]
+          : [0.7, 0.02, 0.14];
+      const markY = loud || reserved ? 0.5 : 0.42;
+      const color = off
+        ? "#cdd0c5"
+        : reserved
+          ? "#a6a499"
+          : loud
+            ? "#6f9a6a"
+            : "#b4c2a4";
       signs.push(
         {
-          m: { x: p.x, y: 0.5, z: p.z, sx: bar[0], sy: bar[1], sz: bar[2] },
+          m: { x: p.x, y: markY, z: p.z, sx: bar[0], sy: bar[1], sz: bar[2] },
           c: color,
           r,
         },
         {
           m: {
             x: p.x,
-            y: 0.5,
+            y: markY,
             z: p.z,
             sx: bar[2],
             sy: bar[1],
@@ -143,7 +171,7 @@ export function PlotField({
     write(soil.current, soils);
     write(stakes.current, posts);
     write(marks.current, signs);
-  }, [plots, muted]);
+  }, [plots, muted, emphasis]);
   const pick = (e: ThreeEvent<PointerEvent | MouseEvent>) =>
     e.instanceId === undefined ? undefined : plots[e.instanceId];
   return (

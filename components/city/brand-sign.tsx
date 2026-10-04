@@ -446,12 +446,21 @@ export function BrandSign({
         />
       )}
       {(kind === "digital" || kind === "custom") && (
-        <Piece
-          position={[0, 1.7, d / 2 + 0.32]}
-          size={[w * 1.08, 0.12, 0.65]}
-          color={theme.accent}
-          glow={0.12}
-        />
+        <>
+          <Piece
+            position={[0, 1.7, d / 2 + 0.32]}
+            size={[w * 1.08, 0.12, 0.65]}
+            color={theme.accent}
+            glow={0.12}
+          />
+          {/* Brand-colored corner pilaster: the silhouette reads as the brand's from afar. */}
+          <Piece
+            position={[-w / 2 + 0.08, h / 2, d / 2 + 0.06]}
+            size={[0.24, h, 0.24]}
+            color={theme.accent}
+            glow={0.08}
+          />
+        </>
       )}
     </group>
   );

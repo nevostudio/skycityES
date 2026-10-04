@@ -47,12 +47,12 @@ export type SignSpec = {
 };
 /** Clear progression: STARTER small → LANDMARK large and lit. Skyscrapers get the largest. */
 export const ROOFTOP_SIGN: Record<BuildingTier, SignSpec> = {
-  STARTER: { width: 1.6, height: 0.6, lift: 0.3, pixels: 512, lit: false },
-  PLUS: { width: 2.1, height: 0.78, lift: 0.4, pixels: 640, lit: false },
-  PRO: { width: 2.7, height: 1.02, lift: 0.5, pixels: 768, lit: false },
-  PREMIUM: { width: 3.2, height: 1.28, lift: 0.62, pixels: 1024, lit: false },
-  LANDMARK: { width: 3.7, height: 1.6, lift: 0.75, pixels: 1024, lit: true },
-  SKYSCRAPER: { width: 4, height: 1.8, lift: 0.9, pixels: 1024, lit: true },
+  STARTER: { width: 2.2, height: 0.86, lift: 0.35, pixels: 640, lit: false },
+  PLUS: { width: 2.8, height: 1.06, lift: 0.45, pixels: 768, lit: false },
+  PRO: { width: 3.4, height: 1.3, lift: 0.55, pixels: 1024, lit: false },
+  PREMIUM: { width: 4, height: 1.6, lift: 0.65, pixels: 1024, lit: false },
+  LANDMARK: { width: 4.6, height: 1.95, lift: 0.8, pixels: 1024, lit: true },
+  SKYSCRAPER: { width: 5.2, height: 2.2, lift: 0.95, pixels: 1024, lit: true },
 };
 /**
  * Rooftop signs turn towards the city's default viewpoint (the camera's azimuth), so names
@@ -60,7 +60,7 @@ export const ROOFTOP_SIGN: Record<BuildingTier, SignSpec> = {
  */
 export const SIGN_YAW = 0.55;
 /** Signs never exceed this much of the roof width, nor the room left by neighbours. */
-export const SIGN_ROOF_RATIO = 1.3;
+export const SIGN_ROOF_RATIO = 1.55;
 export function signSize(
   tier: BuildingTier,
   roofWidth: number,
