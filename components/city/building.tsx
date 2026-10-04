@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect, useMemo, useRef, memo } from "react";
 import { useFrame } from "@react-three/fiber";
-import { BrandSign, brandTheme, brandKind } from "./brand-sign";
+import { BrandSign } from "./brand-sign";
+import { brandTheme } from "@/lib/brand-theme";
 import { districtStyle, districtWall } from "./district-style";
 import { PresenceArchitecture } from "./presence-architecture";
 import { presenceLevel } from "@/lib/presence";
+import { signSize } from "@/lib/branding";
 import type { ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Ad, PublicProperty } from "@/types";
@@ -195,6 +197,7 @@ export const Building = memo(function Building({
   muted,
   faded = false,
   construction,
+  signWidth,
   onBuilt,
   onSelect,
   onHover,
@@ -204,6 +207,8 @@ export const Building = memo(function Building({
   muted: boolean;
   faded?: boolean;
   construction?: Construction;
+  /** Room left by neighbours for the rooftop sign. */
+  signWidth?: number;
   onBuilt?: (id: string) => void;
   onSelect: (p: PublicProperty) => void;
   onHover: (p: PublicProperty | null) => void;
@@ -277,28 +282,28 @@ export const Building = memo(function Building({
   const civic = p.building?.kind === "public";
   const sky = p.building?.tier === "SKYSCRAPER";
   const district = districtStyle(p.districtId);
-  const kind = p.ad ? brandKind(p.ad) : "";
   const highlightHeight =
     h +
-    (sky
-      ? 4.2
-      : level >= 3
-        ? 3
-        : civic
-          ? 2.6
-          : p.ad && ["cafe", "garden", "lab"].includes(kind)
-            ? 0.8
+    (p.ad
+      ? (() => {
+          const sign = signSize(p.building?.tier ?? "STARTER", w, signWidth);
+          return 0.34 + sign.lift + sign.height;
+        })()
+      : sky
+        ? 4.2
+        : level >= 3
+          ? 3
+          : civic
+            ? 2.6
             : p.type === "house" && level <= 1
               ? 1.3
-              : p.ad
-                ? 2.05
-                : 0.9);
+              : 0.9);
   const color = muted
     ? "#c8cebf"
-    : p.ad
-      ? brandTheme(p.ad).background
-      : civic
-        ? p.color
+    : civic
+      ? p.color
+      : p.ad
+        ? brandTheme(p.ad).background
         : districtWall(p);
   const plain = !p.ad && !civic;
   function enter(e: ThreeEvent<PointerEvent>) {
@@ -372,7 +377,7 @@ export const Building = memo(function Building({
           scale={[w + 0.15, 0.24, d + 0.15]}
           color={p.ad ? brandTheme(p.ad).accent : district.roof}
         />
-        {p.type === "house" && level <= 1 && !civic ? (
+        {p.type === "house" && level <= 1 && !civic && !p.ad ? (
           <mesh
             geometry={cone}
             position={[0, h + 0.65, 0]}
@@ -384,11 +389,13 @@ export const Building = memo(function Building({
           </mesh>
         ) : (
           <>
-            <Block
-              position={[-w * 0.14, h + 0.45, 0]}
-              scale={[w * 0.45, 0.7, d * 0.45]}
-              color="#c3c5b8"
-            />
+            {!p.ad && (
+              <Block
+                position={[-w * 0.14, h + 0.45, 0]}
+                scale={[w * 0.45, 0.7, d * 0.45]}
+                color="#c3c5b8"
+              />
+            )}
             {h > 10 && plain && (
               <Block
                 position={[0, h + 1.8, 0]}
@@ -494,8 +501,13 @@ export const Building = memo(function Building({
             />
           </>
         )}
-        {civic && <CivicDetails p={p} />}
-        {p.ad && !faded && <BrandSign p={p as PublicProperty & { ad: Ad }} />}
+        {civic && !p.ad && <CivicDetails p={p} />}
+        {p.ad && !faded && (
+          <BrandSign
+            p={p as PublicProperty & { ad: Ad }}
+            maxSignWidth={signWidth}
+          />
+        )}
       </group>
       {selected && !building && (
         <SelectionFrame w={w} d={d} h={highlightHeight} />

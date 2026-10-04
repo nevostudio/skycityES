@@ -8,6 +8,7 @@ import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 import type { District, PublicProperty } from "@/types";
 import { euro, siteNote } from "@/lib/client";
 import { FLOOR_HEIGHT, GROUND_FLOOR_HEIGHT } from "@/lib/presence";
+import { signLimits } from "@/lib/branding";
 
 import {
   Building,
@@ -18,7 +19,7 @@ import {
   type Construction,
 } from "./building";
 import { PlotField, PlotHighlight, PremiumSite } from "./plots";
-import { brandKind } from "./brand-sign";
+import { brandKind } from "@/lib/brand-theme";
 import { districtStyle } from "./district-style";
 import { useSceneMotion } from "./scene-motion";
 import { NeighborhoodDetails, RiverLife } from "./neighborhood-details";
@@ -409,6 +410,8 @@ export default function CityScene({
     }),
     [properties],
   );
+  // Basic overlap prevention between neighbouring rooftop signs.
+  const signRoom = useMemo(() => signLimits(built), [built]);
   const mutedPlots = useMemo(
     () => new Set(plots.filter((p) => !visible.has(p.id)).map((p) => p.id)),
     [plots, visible],
@@ -592,6 +595,7 @@ export default function CityScene({
           muted={!visible.has(p.id)}
           faded={faded.has(p.id)}
           construction={constructing[p.id]}
+          signWidth={signRoom[p.id]}
           onBuilt={onBuilt}
           onSelect={onSelect}
           onHover={setHover}

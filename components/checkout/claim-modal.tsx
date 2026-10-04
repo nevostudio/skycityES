@@ -230,7 +230,11 @@ export function ClaimModal({
                   ? "1. Personaliza tu rascacielos"
                   : "2. Personaliza tu edificio"}
               </h3>
-              <AdFields ad={ad} onChange={setAd} />
+              <AdFields
+                ad={ad}
+                onChange={setAd}
+                tier={sky ? "SKYSCRAPER" : presenceTier}
+              />
             </>
           )}
           <label>

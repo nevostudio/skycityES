@@ -139,7 +139,11 @@ export function citySnapshot(
                 : a || p.sale === "auction"
                   ? "auction"
                   : "available",
-        ad: lease?.ad.status === "active" ? lease.ad : undefined,
+        ad: lease
+          ? lease.ad.status === "active"
+            ? lease.ad
+            : undefined
+          : b?.branding,
         views: s.analytics
           .filter((e) => e.propertyId === p.id && e.event === "property_open")
           .reduce((a, e) => a + e.count, 0),

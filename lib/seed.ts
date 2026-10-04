@@ -21,6 +21,7 @@ import {
 } from "./plots";
 export const emptyAd: Ad = {
   brand: "",
+  tagline: "",
   description: "",
   website: "",
   instagram: "",
@@ -33,7 +34,7 @@ export const emptyAd: Ad = {
   cta: "Visitar web",
   primary: "#e77d59",
   secondary: "#fcf5e9",
-  style: "rooftop",
+  support: "SIDE_BILLBOARD",
   status: "active",
 };
 const layout: Omit<District, "name" | "subtitle">[] = [
@@ -118,6 +119,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
     return makeBuilding(p, def.tier, new Date(0).toISOString(), {
       id: `bld-public-${def.number}`,
       kind: "public",
+      ...(def.branding ? { branding: structuredClone(def.branding) } : {}),
     });
   });
   const leases: Lease[] = demo
@@ -128,6 +130,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
         ad: {
           ...emptyAd,
           brand: s.brand,
+          tagline: s.tagline,
           description: DEMO_DESCRIPTION,
           primary: s.primary,
           website: "https://example.com",
@@ -187,6 +190,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
         moderation: "automatic",
         pricingVersion: 1,
         plotsVersion: 1,
+        brandingVersion: 1,
       },
     ],
   };

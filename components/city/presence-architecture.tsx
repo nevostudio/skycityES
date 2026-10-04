@@ -14,7 +14,8 @@ export function PresenceArchitecture({ p }: { p: PublicProperty }) {
     <group name={`presence-${p.building?.tier || "EMPTY"}-${p.id}`}>
       {level >= 3 && (
         <>
-          {(p.model % 3 === 0 ? [0, 1] : [0]).map((i) => (
+          {/* A branded roof carries its rooftop sign instead of a sculpted crown. */}
+          {(p.ad ? [] : p.model % 3 === 0 ? [0, 1] : [0]).map((i) => (
             <mesh
               key={i}
               position={[0, h + 0.6 + i * 0.8, -d * 0.12]}
@@ -41,7 +42,7 @@ export function PresenceArchitecture({ p }: { p: PublicProperty }) {
               />
             </mesh>
           ))}
-          {p.model % 3 === 1 && (
+          {!p.ad && p.model % 3 === 1 && (
             <mesh
               position={[0, h + 1.5, -d * 0.15]}
               scale={[w * 0.4, 0.8, d * 0.36]}
@@ -54,7 +55,8 @@ export function PresenceArchitecture({ p }: { p: PublicProperty }) {
               />
             </mesh>
           )}
-          {p.model % 3 === 2 &&
+          {!p.ad &&
+            p.model % 3 === 2 &&
             [-1, 1].map((side) => (
               <mesh key={side} position={[side * w * 0.32, h + 0.7, 0]}>
                 <boxGeometry args={[0.08, 1.4, d * 0.8]} />
@@ -78,7 +80,7 @@ export function PresenceArchitecture({ p }: { p: PublicProperty }) {
             />
           </mesh>
         ))}
-      {sky && (
+      {sky && !p.ad && (
         <mesh position={[0, h + 2.6, 0]}>
           <boxGeometry args={[0.12, 3, 0.12]} />
           <meshStandardMaterial

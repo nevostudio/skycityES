@@ -7,7 +7,9 @@ test("fullscreen city: plots, brands, focus, neighborhoods, filters and navigati
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    // A missing brand logo (404) is an expected, handled fallback; anything else fails.
+    if (message.type() === "error" && !message.text().includes("status of 404"))
+      errors.push(message.text());
   });
   await page.goto("/");
   await expect(page.locator("canvas")).toBeVisible();

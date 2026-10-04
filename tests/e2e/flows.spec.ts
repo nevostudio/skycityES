@@ -67,11 +67,11 @@ test("explorar → construir aquí → compartir → editar → enlace de acceso
   ).toBeVisible();
   await expect(page.getByText(/Pago único · Anuncio activo/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Renovar/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Editar anuncio" }).click();
+  await page.getByRole("button", { name: "Editar marca" }).click();
   await page
     .getByRole("textbox", { name: "Nombre de la marca", exact: true })
     .fill("Browser Studio Updated");
-  await page.getByRole("button", { name: "Guardar anuncio" }).click();
+  await page.getByRole("button", { name: "Guardar marca" }).click();
   await expect(
     page.getByRole("heading", { name: "Browser Studio Updated", exact: true }),
   ).toBeVisible();

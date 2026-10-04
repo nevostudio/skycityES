@@ -25,8 +25,13 @@ export type UpgradeRecord = {
   amount: number;
   createdAt: string;
 };
+/** Where the optional advertising image is shown. The rooftop sign is always present. */
+export type ImageSupport =
+  "SIDE_BILLBOARD" | "PARTIAL_FACADE" | "FULL_FACADE" | "VERTICAL_SCREEN";
 export type Ad = {
   brand: string;
+  /** Short phrase under the name on the rooftop sign. */
+  tagline: string;
   description: string;
   website: string;
   instagram: string;
@@ -37,9 +42,13 @@ export type Ad = {
   banner: string;
   promo: string;
   cta: string;
+  /** Brand accent color. */
   primary: string;
+  /** Rooftop sign background. */
   secondary: string;
-  style: "rooftop" | "facade" | "billboard";
+  support: ImageSupport;
+  /** Legacy sign style, replaced by `support`. */
+  style?: "rooftop" | "facade" | "billboard";
   status: "draft" | "pending" | "active" | "rejected" | "suspended";
 };
 export type District = {
@@ -111,6 +120,8 @@ export type Building = {
   upgradedAt?: string;
   previousTier?: BuildingTier;
   demo: boolean;
+  /** Branding of city-owned buildings (no lease). */
+  branding?: Ad;
 };
 export type Reservation = {
   id: string;
@@ -209,6 +220,7 @@ export type Settings = {
   moderation: "automatic" | "review";
   pricingVersion?: number;
   plotsVersion?: number;
+  brandingVersion?: number;
 };
 export type State = {
   properties: Property[];

@@ -1,263 +1,19 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useSceneMotion } from "./scene-motion";
+import { useCanvasTexture } from "./sign-texture";
 import * as THREE from "three";
-import type { Ad, PublicProperty } from "@/types";
+import type { Ad, BuildingTier, ImageSupport, PublicProperty } from "@/types";
 import { presenceLevel } from "@/lib/presence";
-import { isShowcaseAd } from "@/lib/plots";
+import { brandKind, brandTheme, signColors } from "@/lib/brand-theme";
+import { SIGN_YAW, effectiveSupport, signSize } from "@/lib/branding";
+import {
+  drawRooftopSign,
+  drawSupportImage,
+  loadBitmap,
+} from "@/lib/sign-canvas";
 
-export function brandKind(ad: Ad) {
-  const kinds: Record<string, string> = {
-    "Pixel Coffee": "cafe",
-    "Moonlight Club": "nightlife",
-    "Green Market": "garden",
-    "Nova Labs": "lab",
-    "Orbit Studio": "studio",
-    Hyperbyte: "digital",
-  };
-  return isShowcaseAd(ad) ? kinds[ad.brand] || "custom" : "custom";
-}
-export function brandTheme(ad: Ad) {
-  const demo = isShowcaseAd(ad);
-  const palette: Record<
-    string,
-    { accent: string; background: string; ink: string }
-  > = {
-    "Nova Labs": { accent: "#e87940", background: "#f5f1e7", ink: "#20342e" },
-    "Pixel Coffee": {
-      accent: "#c59059",
-      background: "#614836",
-      ink: "#fff1d9",
-    },
-    "Moonlight Club": {
-      accent: "#aa63e6",
-      background: "#2b263d",
-      ink: "#ecd6ff",
-    },
-    "Green Market": {
-      accent: "#78994f",
-      background: "#d1ddba",
-      ink: "#345337",
-    },
-    "Orbit Studio": {
-      accent: "#d1a582",
-      background: "#38393b",
-      ink: "#faf3e5",
-    },
-    Hyperbyte: { accent: "#6daabd", background: "#253e49", ink: "#e9f6f7" },
-  };
-  const originalColors: Record<string, string> = {
-    "Nova Labs": "#648688",
-    "Pixel Coffee": "#895f48",
-    "Orbit Studio": "#81719f",
-    "Green Market": "#73966f",
-    "Moonlight Club": "#b08499",
-    Hyperbyte: "#6481a3",
-  };
-  return demo &&
-    palette[ad.brand] &&
-    ad.primary === originalColors[ad.brand] &&
-    ad.secondary === "#fcf5e9"
-    ? palette[ad.brand]
-    : {
-        accent: ad.primary,
-        background: new THREE.Color(ad.primary).multiplyScalar(0.22).getStyle(),
-        ink: ad.secondary,
-      };
-}
-function mark(
-  c: CanvasRenderingContext2D,
-  brand: string,
-  color: string,
-  x: number,
-  y: number,
-  size: number,
-) {
-  c.save();
-  c.translate(x, y);
-  c.scale(size / 100, size / 100);
-  c.fillStyle = color;
-  c.strokeStyle = color;
-  c.lineWidth = 5;
-  if (brand === "Nova Labs") {
-    c.beginPath();
-    c.moveTo(0, -43);
-    c.lineTo(39, -20);
-    c.lineTo(0, 3);
-    c.lineTo(-39, -20);
-    c.closePath();
-    c.fill();
-    c.globalAlpha = 0.85;
-    c.beginPath();
-    c.moveTo(-39, -15);
-    c.lineTo(-3, 8);
-    c.lineTo(-3, 48);
-    c.lineTo(-39, 25);
-    c.closePath();
-    c.fill();
-    c.globalAlpha = 0.6;
-    c.beginPath();
-    c.moveTo(3, 8);
-    c.lineTo(39, -15);
-    c.lineTo(39, 25);
-    c.lineTo(3, 48);
-    c.closePath();
-    c.fill();
-  } else if (brand === "Pixel Coffee") {
-    c.beginPath();
-    c.moveTo(-31, -14);
-    c.lineTo(-27, 15);
-    c.quadraticCurveTo(0, 42, 26, 15);
-    c.lineTo(31, -14);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.ellipse(36, -1, 13, 12, 0, -1.7, 1.7);
-    c.stroke();
-    c.beginPath();
-    c.moveTo(-38, 35);
-    c.lineTo(36, 35);
-    c.stroke();
-    for (const dx of [-13, 7]) {
-      c.beginPath();
-      c.moveTo(dx, -27);
-      c.bezierCurveTo(dx - 17, -40, dx + 15, -40, dx, -56);
-      c.stroke();
-    }
-  } else if (brand === "Orbit Studio") {
-    c.beginPath();
-    c.ellipse(0, 0, 28, 43, 0.45, 0, Math.PI * 2);
-    c.stroke();
-    c.beginPath();
-    c.ellipse(0, 0, 50, 20, -0.4, 0, Math.PI * 2);
-    c.stroke();
-  } else if (brand === "Green Market") {
-    c.beginPath();
-    c.ellipse(-17, -5, 17, 35, -0.5, 0, Math.PI * 2);
-    c.fill();
-    c.beginPath();
-    c.ellipse(20, 6, 17, 31, 0.55, 0, Math.PI * 2);
-    c.fill();
-  } else if (brand === "Moonlight Club") {
-    c.beginPath();
-    c.arc(0, 0, 39, 0.45, 5.35);
-    c.stroke();
-    c.beginPath();
-    c.arc(14, -4, 29, 1.25, 4.45);
-    c.stroke();
-  } else {
-    c.font = "bold 92px sans-serif";
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillText(brand.slice(0, 1).toUpperCase(), 0, 0);
-  }
-  c.restore();
-}
-
-function useSign(ad: Ad, symbol = false) {
-  const theme = brandTheme(ad),
-    kind = brandKind(ad);
-  const texture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1024;
-    canvas.height = symbol ? 1024 : 512;
-    const c = canvas.getContext("2d")!;
-    c.fillStyle = theme.background;
-    c.fillRect(0, 0, 1024, canvas.height);
-    if (symbol) {
-      mark(c, ad.brand, theme.accent, 512, 480, 520);
-      if (kind === "garden") {
-        c.strokeStyle = theme.accent;
-        c.lineWidth = 3;
-        for (let i = 0; i < 6; i++) {
-          c.beginPath();
-          c.arc(512, 500, 340 + i * 22, 0, Math.PI * 2);
-          c.stroke();
-        }
-      }
-      if (kind === "lab" || kind === "digital") {
-        c.strokeStyle = theme.accent;
-        c.lineWidth = 4;
-        for (let i = 0; i < 5; i++) {
-          c.beginPath();
-          c.moveTo(80, 850 + i * 22);
-          c.lineTo(410, 770 + i * 22);
-          c.lineTo(944, 900 + i * 22);
-          c.stroke();
-        }
-      }
-    } else {
-      mark(c, ad.brand, theme.accent, 150, 250, 170);
-      c.fillStyle = theme.ink;
-      c.textAlign = "left";
-      c.font =
-        kind === "cafe"
-          ? "bold 170px Georgia"
-          : kind === "nightlife"
-            ? "italic bold 170px Georgia"
-            : kind === "garden"
-              ? "bold 162px Georgia"
-              : "bold 168px sans-serif";
-      if (kind === "nightlife") {
-        c.shadowColor = theme.accent;
-        c.shadowBlur = 16;
-      }
-      const words = ad.brand.trim().split(/\s+/);
-      if (words.length > 1) {
-        c.fillText(words.slice(0, -1).join(" "), 280, 224, 700);
-        c.fillText(words.at(-1)!, 280, 410, 700);
-      } else c.fillText(ad.brand, 280, 312, 700);
-    }
-    const t = new THREE.CanvasTexture(canvas);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
-    return t;
-  }, [
-    ad.brand,
-    ad.logo,
-    ad.banner,
-    theme.background,
-    theme.ink,
-    theme.accent,
-    kind,
-    symbol,
-  ]);
-  useEffect(() => {
-    let active = true;
-    const url = symbol ? ad.banner || ad.logo : ad.logo;
-    if (url) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        if (!active) return;
-        const c = (texture.image as HTMLCanvasElement).getContext("2d")!;
-        const x = symbol ? 212 : 65,
-          y = symbol ? 212 : 165,
-          side = symbol ? 600 : 170;
-        c.fillStyle = theme.background;
-        c.fillRect(x - 15, y - 15, side + 30, side + 30);
-        const ratio = Math.min(side / img.width, side / img.height),
-          width = img.width * ratio,
-          height = img.height * ratio;
-        c.drawImage(
-          img,
-          x + (side - width) / 2,
-          y + (side - height) / 2,
-          width,
-          height,
-        );
-        texture.needsUpdate = true;
-      };
-      img.src = url;
-    }
-    return () => {
-      active = false;
-      texture.dispose();
-    };
-  }, [texture, ad.logo, ad.banner, theme.background, symbol]);
-  return texture;
-}
 function Piece({
   position,
   size,
@@ -302,30 +58,238 @@ function Planter({
     </group>
   );
 }
-export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
-  const name = useSign(p.ad),
-    symbol = useSign(p.ad, true),
-    theme = brandTheme(p.ad),
+const contentKey = (ad: Ad) =>
+  [ad.brand, ad.tagline, ad.logo, ad.primary, ad.secondary, ad.description]
+    .map((v) => v || "")
+    .join("|");
+
+/**
+ * The brand's main support: a physical sign standing on the roof (posts, frame and face).
+ * Its size follows the building tier and is capped by the room left by its neighbours.
+ */
+export function RooftopSign({
+  p,
+  tier,
+  maxWidth,
+}: {
+  p: PublicProperty & { ad: Ad };
+  tier: BuildingTier;
+  maxWidth?: number;
+}) {
+  const size = signSize(tier, p.width, maxWidth);
+  const px = size.pixels;
+  const texture = useCanvasTexture(
+    `roof:${px}:${size.width.toFixed(2)}:${size.lit}:${contentKey(p.ad)}`,
+    px,
+    (px * size.height) / size.width,
+    (canvas, update) => {
+      drawRooftopSign(canvas, p.ad, null, size.lit);
+      if (p.ad.logo)
+        void loadBitmap(p.ad.logo).then((logo) => {
+          if (!logo) return;
+          drawRooftopSign(canvas, p.ad, logo, size.lit);
+          update();
+        });
+    },
+  );
+  const { accent } = signColors(p.ad);
+  const roof = p.height + 0.24;
+  const bottom = roof + size.lift;
+  const y = bottom + size.height / 2;
+  const z = 0;
+  const frame = size.lit ? "#1f2623" : "#3c4541";
+  return (
+    <group
+      name={`rooftop-sign-${p.id}`}
+      position={[0, 0, p.depth * 0.1]}
+      rotation={[0, SIGN_YAW, 0]}
+    >
+      {[-0.36, 0.36].map((k) => (
+        <mesh
+          key={k}
+          position={[k * size.width, (roof + bottom) / 2 + 0.05, z - 0.02]}
+          castShadow
+        >
+          <boxGeometry args={[0.08, size.lift + 0.1, 0.08]} />
+          <meshStandardMaterial color={frame} roughness={0.6} />
+        </mesh>
+      ))}
+      <mesh position={[0, y, z]} castShadow>
+        <boxGeometry args={[size.width + 0.1, size.height + 0.1, 0.1]} />
+        <meshStandardMaterial color={frame} roughness={0.55} />
+      </mesh>
+      {texture && (
+        <mesh position={[0, y, z + 0.052]}>
+          <planeGeometry args={[size.width, size.height]} />
+          <meshBasicMaterial map={texture} toneMapped={false} />
+        </mesh>
+      )}
+      {size.lit &&
+        [1, -1].map((side) => (
+          <mesh
+            key={side}
+            position={[0, y + side * (size.height / 2 + 0.06), z + 0.03]}
+          >
+            <boxGeometry args={[size.width + 0.12, 0.05, 0.14]} />
+            <meshStandardMaterial
+              color={accent}
+              emissive={accent}
+              emissiveIntensity={1.1}
+              toneMapped={false}
+            />
+          </mesh>
+        ))}
+      {size.lit &&
+        [-0.3, 0, 0.3].map((k) => (
+          <mesh key={k} position={[k * size.width, bottom - 0.02, z + 0.22]}>
+            <boxGeometry args={[0.16, 0.06, 0.12]} />
+            <meshBasicMaterial color="#fff3cf" toneMapped={false} />
+          </mesh>
+        ))}
+    </group>
+  );
+}
+
+type Spot = {
+  position: [number, number, number];
+  size: [number, number];
+  side: boolean;
+  glow: boolean;
+};
+/** Advertising image placements, prepared for every support; the first three are prioritised. */
+function placement(
+  support: ImageSupport,
+  w: number,
+  h: number,
+  d: number,
+): Spot | null {
+  if (support === "SIDE_BILLBOARD") {
+    const sw = Math.min(d * 0.85, 2.6),
+      sh = sw * 0.6;
+    if (h < sh + 1.2) return null;
+    const y = Math.max(h - sh / 2 - 0.35, sh / 2 + 0.6);
+    return {
+      position: [w / 2 + 0.17, y, 0],
+      size: [sw, sh],
+      side: true,
+      glow: false,
+    };
+  }
+  if (support === "PARTIAL_FACADE") {
+    const pw = w * 0.78,
+      ph = Math.min(pw * 0.62, h - 2.6);
+    if (ph < 0.8) return null;
+    return {
+      position: [0, h - 0.35 - ph / 2, d / 2 + 0.07],
+      size: [pw, ph],
+      side: false,
+      glow: false,
+    };
+  }
+  if (support === "FULL_FACADE") {
+    const ph = h - 2.5;
+    if (ph < 1.5) return null;
+    return {
+      position: [0, 2.25 + ph / 2, d / 2 + 0.07],
+      size: [w * 0.94, ph],
+      side: false,
+      glow: false,
+    };
+  }
+  const sh = Math.min(h * 0.72, 9);
+  if (sh < 3) return null;
+  return {
+    position: [w / 2 + 0.15, h - sh / 2 - 0.4, d * 0.18],
+    size: [0.95, sh],
+    side: true,
+    glow: true,
+  };
+}
+export function ImageSupportView({
+  p,
+  support,
+}: {
+  p: PublicProperty & { ad: Ad };
+  support: ImageSupport;
+}) {
+  const spot = placement(support, p.width, p.height, p.depth);
+  const [sw, sh] = spot?.size ?? [1, 1];
+  const px = Math.round(Math.min(1024, 380 * Math.max(sw, sh)));
+  const texture = useCanvasTexture(
+    spot
+      ? `support:${support}:${sw.toFixed(2)}x${sh.toFixed(2)}:${p.ad.banner}:${contentKey(p.ad)}`
+      : null,
+    sw >= sh ? px : (px * sw) / sh,
+    sw >= sh ? (px * sh) / sw : px,
+    (canvas, update) => {
+      drawSupportImage(canvas, p.ad, null, null);
+      void Promise.all([
+        p.ad.banner ? loadBitmap(p.ad.banner, 1024) : null,
+        p.ad.logo ? loadBitmap(p.ad.logo) : null,
+      ]).then(([banner, logo]) => {
+        if (!banner && !logo) return;
+        drawSupportImage(canvas, p.ad, banner, logo);
+        update();
+      });
+    },
+  );
+  if (!spot) return null;
+  const { accent } = signColors(p.ad);
+  return (
+    <group
+      name={`support-${support}-${p.id}`}
+      position={spot.position}
+      rotation={[0, spot.side ? Math.PI / 2 : 0, 0]}
+    >
+      <mesh position={[0, 0, -0.04]} castShadow>
+        <boxGeometry args={[sw + 0.12, sh + 0.12, 0.06]} />
+        <meshStandardMaterial
+          color={spot.glow ? accent : "#3c4541"}
+          emissive={spot.glow ? accent : "#000000"}
+          emissiveIntensity={spot.glow ? 0.6 : 0}
+          roughness={0.6}
+        />
+      </mesh>
+      {texture && (
+        <mesh>
+          <planeGeometry args={[sw, sh]} />
+          <meshBasicMaterial map={texture} toneMapped={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * Branding of a building: one rooftop sign with the name, one image support, and the
+ * accent in the architecture. The name is never repeated across the facades.
+ */
+export function BrandSign({
+  p,
+  maxSignWidth,
+}: {
+  p: PublicProperty & { ad: Ad };
+  maxSignWidth?: number;
+}) {
+  const theme = brandTheme(p.ad),
     kind = brandKind(p.ad);
   const motion = useSceneMotion(),
     time = useRef(0),
     neon = useRef<THREE.MeshStandardMaterial>(null);
+  const tier = p.building?.tier ?? "STARTER";
   const h = p.height,
     w = p.width,
     d = p.depth;
   const cafe = kind === "cafe",
     garden = kind === "garden",
     club = kind === "nightlife";
-  const level = presenceLevel(p.building?.tier);
-  const rooftop = level >= 3;
-  const signWidth = w * (level === 0 ? 0.82 : 1.03);
-  const signY = rooftop
-    ? h + (p.type === "house" ? 1.9 : 1.05)
-    : cafe || garden
-      ? Math.max(h - 0.55, Math.min(2.35, h - 0.45))
-      : Math.max(h * 0.74, h - 1.05);
-  const signH = rooftop ? 1.75 : level === 0 ? 0.9 : Math.min(1.6, h * 0.48);
-  const sideSize = Math.min(d * 0.86, h * 0.7);
+  const level = presenceLevel(tier);
+  // Without an advertising image only the side billboard shows the logo (never the name).
+  const support = p.ad.banner
+    ? effectiveSupport(p.ad, tier)
+    : level >= 1
+      ? effectiveSupport({ support: "SIDE_BILLBOARD" }, tier)
+      : null;
   useFrame((_, delta) => {
     if (!motion || !neon.current) return;
     time.current += Math.min(delta, 0.05);
@@ -333,33 +297,8 @@ export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
   });
   return (
     <group name={"branding-" + p.id}>
-      {/* One primary name and one secondary symbol: ownership without wallpapering the facade. */}
-      <mesh position={[0, signY, d / 2 + 0.19]} castShadow>
-        <boxGeometry args={[signWidth + 0.12, signH + 0.12, 0.2]} />
-        <meshStandardMaterial color={cafe ? "#aa855e" : theme.background} />
-      </mesh>
-      <mesh position={[0, signY, d / 2 + 0.3]}>
-        <planeGeometry args={[signWidth, signH]} />
-        <meshBasicMaterial map={name} toneMapped={false} />
-      </mesh>
-      {level >= 2 && (
-        <mesh
-          position={[w / 2 + 0.24, h * 0.53, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-        >
-          <planeGeometry args={[sideSize, sideSize * (level >= 4 ? 1.7 : 1)]} />
-          <meshBasicMaterial map={symbol} toneMapped={false} />
-        </mesh>
-      )}
-      {rooftop &&
-        [-1, 1].map((side) => (
-          <Piece
-            key={side}
-            position={[side * w * 0.32, h + 0.42, d / 2 + 0.18]}
-            size={[0.1, 0.85, 0.14]}
-            color={theme.accent}
-          />
-        ))}
+      <RooftopSign p={p} tier={tier} maxWidth={maxSignWidth} />
+      {support && <ImageSupportView p={p} support={support} />}
       <Piece
         position={[0, h + 0.25, 0]}
         size={[w + 0.18, 0.14, d + 0.18]}
@@ -406,7 +345,7 @@ export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
             </group>
           ))}
           <Piece
-            position={[0, signY + signH * 0.5 + 0.12, d / 2 + 0.32]}
+            position={[0, 1.78, d / 2 + 0.32]}
             size={[w * 0.9, 0.055, 0.08]}
             color="#ffcf89"
             glow={0.6}
@@ -416,18 +355,13 @@ export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
       {garden && (
         <>
           <Piece
-            position={[0, h + 0.38, 0]}
-            size={[w * 0.85, 0.22, d * 0.76]}
+            position={[0, h + 0.38, -d * 0.12]}
+            size={[w * 0.85, 0.22, d * 0.56]}
             color="#7a9755"
           />
-          {[-1, 1].flatMap((x) =>
-            [-1, 1].map((z) => (
-              <Planter
-                key={x + ":" + z}
-                position={[x * w * 0.32, h + 0.45, z * d * 0.28]}
-              />
-            )),
-          )}
+          {[-1, 1].map((x) => (
+            <Planter key={x} position={[x * w * 0.32, h + 0.45, -d * 0.28]} />
+          ))}
           <Piece
             position={[0, 1.5, d / 2 + 0.43]}
             size={[w * 1.15, 0.2, 0.9]}
@@ -468,12 +402,6 @@ export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
             />
           </mesh>
           <Piece
-            position={[w / 2 + 0.28, h * 0.54, d * 0.38]}
-            size={[0.09, h * 0.84, 0.09]}
-            color="#c267e9"
-            glow={0.7}
-          />
-          <Piece
             position={[0, 1.8, d / 2 + 0.42]}
             size={[w * 1.15, 0.1, 0.85]}
             color="#ae66df"
@@ -508,51 +436,22 @@ export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
             size={[w * 0.88, 0.14, 0.7]}
             color={theme.accent}
           />
-          {[-1, 1].map((side) => (
-            <Piece
-              key={side}
-              position={[side * w * 0.22, h + 0.42, 0]}
-              size={[w * 0.32, 0.12, d * 0.5]}
-              color="#526a70"
-            />
-          ))}
         </>
       )}
       {kind === "studio" && (
-        <>
-          <Piece
-            position={[0, 1.8, d / 2 + 0.42]}
-            size={[w * 1.1, 0.13, 0.8]}
-            color="#cfb89c"
-          />
-          <mesh
-            position={[w / 2 + 0.32, h * 0.8, 0]}
-            rotation={[0, Math.PI / 2, 0.3]}
-          >
-            <torusGeometry args={[0.48, 0.025, 6, 32]} />
-            <meshStandardMaterial
-              color="#e5d7ba"
-              emissive="#e5d7ba"
-              emissiveIntensity={0.2}
-            />
-          </mesh>
-        </>
+        <Piece
+          position={[0, 1.8, d / 2 + 0.42]}
+          size={[w * 1.1, 0.13, 0.8]}
+          color="#cfb89c"
+        />
       )}
       {(kind === "digital" || kind === "custom") && (
-        <>
-          <Piece
-            position={[0, 1.7, d / 2 + 0.32]}
-            size={[w * 1.08, 0.12, 0.65]}
-            color={theme.accent}
-            glow={0.12}
-          />
-          <Piece
-            position={[w / 2 + 0.12, h * 0.7, 0]}
-            size={[0.11, 0.07, d * 0.88]}
-            color={theme.accent}
-            glow={0.25}
-          />
-        </>
+        <Piece
+          position={[0, 1.7, d / 2 + 0.32]}
+          size={[w * 1.08, 0.12, 0.65]}
+          color={theme.accent}
+          glow={0.12}
+        />
       )}
     </group>
   );

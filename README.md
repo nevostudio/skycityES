@@ -13,6 +13,16 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 - Edificios iniciales: 6 públicos (SkyCity HQ, NevoStudio, Ayuntamiento, Estación Central, Museo y Biblioteca) y, solo en demo, 4 marcas ficticias (Nova Labs, Pixel Coffee, Green Market y Moonlight Club).
 - Migración versionada (`plotsVersion`, `lib/plots.ts`): los leases activos pasan a edificios construidos y permanentes; los solares libres quedan vacíos; los anuncios demo sobrantes se retiran (marcados, no borrados). Usuarios, transacciones, pujas, subastas y analítica no cambian. En Postgres, aplica `supabase/migrations/20261004190000_plots_buildings.sql` con `npm run db:migrate`.
 
+## Marca y carteles de azotea (fase 2)
+
+- Cada edificio comprado muestra su marca con un **cartel físico en la azotea** (postes, marco y cara con textura): logo, nombre y frase corta opcional. El nombre aparece una sola vez; si el logo es horizontal, sustituye al nombre.
+- El cartel crece con el tier (STARTER pequeño → LANDMARK grande e iluminado), no supera 1,3 veces el ancho de la cubierta y se limita a la mitad del hueco con el vecino más cercano de su fila (`lib/branding.ts`). Está girado hacia la vista principal para leerse a media distancia.
+- Imagen publicitaria opcional en **valla lateral** (desde PLUS), **fachada parcial** (desde PRO), fachada completa (desde PREMIUM) y pantalla vertical (desde LANDMARK). Sin imagen, la valla lateral muestra solo el logo.
+- Subidas (`/api/upload`, `lib/images.ts`): PNG, JPG o WebP de hasta 2 MB, firma real y MIME coherente, una sola imagen (no animada), 32–4096 px para logos y 200–6000 px para imágenes, proporción máxima 8:1. Se recodifican con `sharp` a WebP (512 px para logos, 1600 px para imágenes), conservando la transparencia y eliminando metadatos. En producción se guardan en Supabase Storage con la clave de servicio solo en el servidor.
+- Texturas: un canvas por contenido, compartido y con recuento de referencias; se liberan al desmontar y nunca se crean por frame. Las imágenes se cargan una vez y se reducen antes de usarse.
+- **Mis edificios → Editar marca**: nombre, frase, web, logo, color de acento, fondo del cartel e imagen publicitaria con su soporte, con vista previa del cartel.
+- NevoStudio es el ejemplo de referencia (`public/brands/`): wordmark transparente, acento `#ff4b00` y la frase «Encuentra tus próximos anunciantes».
+
 ## Ejecutar
 
 Requisitos: Node.js **22.13+** (recomendado 24 LTS) y npm.

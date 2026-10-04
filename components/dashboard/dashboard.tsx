@@ -186,7 +186,7 @@ export function Dashboard({ initial }: { initial: CityData }) {
                         }}
                       >
                         <Pencil size={12} />
-                        Editar anuncio
+                        Editar marca
                       </button>
                       <Link
                         className="button outline"
@@ -236,8 +236,16 @@ export function Dashboard({ initial }: { initial: CityData }) {
         )}
       </main>
       {edit && ad && (
-        <Modal title="DALE UN AIRE NUEVO" onClose={() => setEdit(null)}>
-          <h2>Edita tu anuncio.</h2>
+        <Modal
+          title="EDITAR MARCA"
+          onClose={() => setEdit(null)}
+          className="claim-modal"
+        >
+          <h2>Tu marca, en tu edificio.</h2>
+          <p className="muted">
+            Nombre, logo, colores y frase se muestran en el cartel de la azotea.
+            Los cambios se ven en la ciudad al guardar.
+          </p>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -255,14 +263,18 @@ export function Dashboard({ initial }: { initial: CityData }) {
               }
             }}
           >
-            <AdFields ad={ad} onChange={setAd} />
+            <AdFields
+              ad={ad}
+              onChange={setAd}
+              tier={edit.building?.tier || edit.presenceTier || "STARTER"}
+            />
             {error && <p className="error">{error}</p>}
             <button disabled={busy} className="button coral wide">
               {busy ? (
                 <Loader2 className="spin" size={16} />
               ) : (
                 <>
-                  Guardar anuncio
+                  Guardar marca
                   <Pencil size={14} />
                 </>
               )}

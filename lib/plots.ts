@@ -25,6 +25,25 @@ export const SKYSCRAPER_PLOTS: Record<
 };
 export const SKYSCRAPER_PRICE = 200;
 
+/** NevoStudio, the reference example of a fully branded building. */
+export const NEVOSTUDIO_BRANDING: Ad = {
+  brand: "NevoStudio",
+  tagline: "Encuentra tus próximos anunciantes",
+  description: "El estudio que diseña y construye SkyCity.",
+  website: "",
+  instagram: "",
+  tiktok: "",
+  x: "",
+  linkedin: "",
+  logo: "/brands/nevostudio.svg",
+  banner: "/brands/nevostudio-banner.svg",
+  promo: "",
+  cta: "Visitar web",
+  primary: "#ff4b00",
+  secondary: "#f4f4f2",
+  support: "PARTIAL_FACADE",
+  status: "active",
+};
 /** City-owned buildings standing from day one. They have no owner or lease. */
 export const PUBLIC_BUILDINGS: {
   number: number;
@@ -32,6 +51,7 @@ export const PUBLIC_BUILDINGS: {
   tier: PresenceTier;
   color: string;
   description: string;
+  branding?: Ad;
 }[] = [
   {
     number: 3,
@@ -44,8 +64,9 @@ export const PUBLIC_BUILDINGS: {
     number: 73,
     name: "NevoStudio",
     tier: "PREMIUM",
-    color: "#d9e4de",
+    color: "#e9e7e1",
     description: "El estudio que diseña y construye SkyCity.",
+    branding: NEVOSTUDIO_BRANDING,
   },
   {
     number: 140,
@@ -83,11 +104,36 @@ export const DEMO_SHOWCASE: {
   brand: string;
   tier: PresenceTier;
   primary: string;
+  tagline: string;
 }[] = [
-  { number: 13, brand: "Nova Labs", tier: "PRO", primary: "#648688" },
-  { number: 26, brand: "Pixel Coffee", tier: "PREMIUM", primary: "#895f48" },
-  { number: 52, brand: "Green Market", tier: "STARTER", primary: "#73966f" },
-  { number: 65, brand: "Moonlight Club", tier: "PLUS", primary: "#b08499" },
+  {
+    number: 13,
+    brand: "Nova Labs",
+    tier: "PRO",
+    primary: "#648688",
+    tagline: "Ideas que despegan",
+  },
+  {
+    number: 26,
+    brand: "Pixel Coffee",
+    tier: "PREMIUM",
+    primary: "#895f48",
+    tagline: "Café de especialidad",
+  },
+  {
+    number: 52,
+    brand: "Green Market",
+    tier: "STARTER",
+    primary: "#73966f",
+    tagline: "Del huerto a tu mesa",
+  },
+  {
+    number: 65,
+    brand: "Moonlight Club",
+    tier: "PLUS",
+    primary: "#b08499",
+    tagline: "Música hasta el amanecer",
+  },
 ];
 export const DEMO_DESCRIPTION =
   "Una idea independiente con su sitio en la ciudad. Marca ficticia de demostración.";
@@ -287,6 +333,34 @@ export function migratePlots(s: State) {
   }
   for (const l of s.leases) if (l.status === "active") ensureBuilding(s, l);
   settings.plotsVersion = 1;
+  return s;
+}
+
+/**
+ * Branding (phase 2), versioned and additive: every ad gains a tagline and an image support
+ * (legacy "facade" style → partial facade). Customer content is otherwise untouched.
+ */
+export function migrateBranding(s: State) {
+  const settings = s.settings[0];
+  if (settings.brandingVersion === 1) return s;
+  const upgrade = (ad: Ad) => {
+    ad.tagline ??= "";
+    ad.support ??= ad.style === "facade" ? "PARTIAL_FACADE" : "SIDE_BILLBOARD";
+  };
+  for (const l of s.leases) {
+    upgrade(l.ad);
+    const demo = DEMO_SHOWCASE.find((d) => `seed-lease-${d.number}` === l.id);
+    if (demo && isShowcaseAd(l.ad) && !l.ad.tagline)
+      l.ad.tagline = demo.tagline;
+  }
+  for (const r of s.reservations) upgrade(r.ad);
+  for (const def of PUBLIC_BUILDINGS) {
+    const p = s.properties.find((p) => p.number === def.number);
+    const b = p && s.buildings.find((b) => b.propertyId === p.id);
+    if (def.branding && b?.kind === "public" && !b.branding)
+      b.branding = structuredClone(def.branding);
+  }
+  settings.brandingVersion = 1;
   return s;
 }
 
