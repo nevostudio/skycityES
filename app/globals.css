@@ -2921,3 +2921,43 @@ td small {
   margin-left: 6px;
   font-weight: 400;
 }
+
+.takeover-card {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  margin: 14px 0;
+  border: 1px solid #d9e2d8;
+  border-radius: 12px;
+  background: #f5f8f2;
+}
+.takeover-card p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 10px 0;
+}
+.takeover-card .price-row {
+  margin: 0 0 10px;
+}
+.takeover-increments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.takeover-increments .button {
+  padding: 7px 10px;
+  min-height: 32px;
+}
+.takeover-notice {
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid #d9e2d8;
+  border-radius: 12px;
+  background: #f5f8f2;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.takeover-notice p {
+  margin: 10px 0 0;
+}

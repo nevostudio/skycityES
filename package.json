@@ -8,7 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit && prettier --check app components hooks lib types tests scripts *.ts",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write app components hooks lib types tests scripts *.ts *.json"

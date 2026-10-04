@@ -18,6 +18,12 @@ import {
   withBuilding,
 } from "./presence";
 import { makeBuilding } from "./plots";
+import {
+  cents,
+  validMoney,
+  takeoverState,
+  protectionHours,
+} from "./takeover-policy";
 export class DomainError extends Error {
   constructor(
     message: string,
@@ -129,6 +135,7 @@ export function citySnapshot(
         ...withBuilding(p, b?.tier ?? null),
         building: b ? buildingView(b, p.model, now) : null,
         presenceTier: lease?.presenceTier,
+        takeover: takeoverState(s, p, now),
         status:
           b?.kind === "public"
             ? "public"
@@ -291,13 +298,19 @@ export function fulfill(
   amount: number,
   provider: "demo" | "stripe",
   now = Date.now(),
+  stripePaymentId?: string,
 ) {
   const duplicate = s.transactions.find(
-    (t) => t.id === transactionId || t.reservationId === reservationId,
+    (t) =>
+      t.id === transactionId ||
+      t.reservationId === reservationId ||
+      (!!stripePaymentId && t.stripePaymentId === stripePaymentId),
   );
   if (duplicate && duplicate.reservationId !== reservationId)
     throw new DomainError("Este pago ya pertenece a otra reserva.", 409);
   if (duplicate) {
+    if (duplicate.outcome && duplicate.outcome !== "fulfilled")
+      return undefined;
     const r = s.reservations.find((r) => r.id === reservationId);
     return s.leases.find(
       (l) =>
@@ -306,6 +319,16 @@ export function fulfill(
     );
   }
   const r = s.reservations.find((r) => r.id === reservationId);
+  if (r?.purpose === "takeover")
+    return fulfillTakeover(
+      s,
+      r,
+      transactionId,
+      amount,
+      provider,
+      now,
+      stripePaymentId,
+    );
   if (
     !r ||
     r.status !== "reserved" ||
@@ -382,6 +405,11 @@ export function fulfill(
         { id: `bld-${lease.id}`, leaseId: lease.id, demo: lease.demo },
       ),
     );
+    p.current_property_value = r.amount;
+    p.protection_until = new Date(
+      now + protectionHours(s) * 3600000,
+    ).toISOString();
+    p.control_version = (p.control_version || 0) + 1;
   }
   r.status = "paid";
   s.transactions.push({
@@ -391,6 +419,7 @@ export function fulfill(
     email: r.email,
     createdAt: at,
     provider,
+    stripePaymentId,
   });
   s.activity.push({
     id: randomUUID(),
@@ -426,6 +455,178 @@ export function fulfill(
   );
   const auction = s.auctions.find((a) => a.reservationId === r.id);
   if (auction) auction.status = "settled";
+  return lease;
+}
+/** Multiple contenders may pay; only the first valid settlement of this control version wins. */
+export function reserveTakeover(
+  s: State,
+  input: { propertyId: string; email: string; ad: Ad; offerAmount: number },
+  demo: boolean,
+  now = Date.now(),
+) {
+  sweep(s, now);
+  const p = s.properties.find((p) => p.id === input.propertyId);
+  if (!p) throw new DomainError("Solar no encontrado.", 404);
+  const policy = takeoverState(s, p, now);
+  if (!policy.open)
+    throw new DomainError(policy.reason || "Takeover no disponible.", 409);
+  if (
+    !validMoney(input.offerAmount) ||
+    cents(input.offerAmount) < cents(policy.minimumOffer)
+  )
+    throw new DomainError(
+      `El importe mínimo es ${policy.minimumOffer} €.`,
+      409,
+    );
+  const lease = activeLeaseFor(s, p.id)!;
+  if (lease.email === input.email)
+    throw new DomainError("Ya controlas esta ubicación.", 409);
+  const access = token();
+  const reservation: Reservation = {
+    id: randomUUID(),
+    propertyId: p.id,
+    email: input.email,
+    ad: {
+      ...input.ad,
+      status: s.settings[0].moderation === "review" ? "pending" : "active",
+    },
+    purpose: "takeover",
+    expectedControllerId: lease.id,
+    expectedPropertyValue: p.current_property_value ?? 0,
+    expectedControlVersion: p.control_version ?? 0,
+    presenceTier: lease.presenceTier || "STARTER",
+    days: 0,
+    amount: input.offerAmount,
+    status: "reserved",
+    accessHash: hash(access),
+    expiresAt: new Date(
+      now + (demo ? s.settings[0].reservationMinutes : 30) * 60000,
+    ).toISOString(),
+  };
+  s.reservations.push(reservation);
+  return { reservation, access };
+}
+
+function fulfillTakeover(
+  s: State,
+  r: Reservation,
+  transactionId: string,
+  amount: number,
+  provider: "demo" | "stripe",
+  now: number,
+  stripePaymentId?: string,
+) {
+  if (!validMoney(amount) || amount <= 0)
+    throw new DomainError("Importe de pago no válido.", 409);
+  if (provider === "stripe" && !stripePaymentId)
+    throw new DomainError("Falta el identificador del pago.", 409);
+  const p = s.properties.find((p) => p.id === r.propertyId);
+  const old = activeLeaseFor(s, r.propertyId);
+  const b = buildingFor(s, r.propertyId);
+  const policy = p && takeoverState(s, p, now);
+  const conflict =
+    r.status !== "reserved" ||
+    (provider === "demo" && Date.parse(r.expiresAt) <= now)
+      ? "La reserva ya no está vigente."
+      : !policy?.open
+        ? policy?.reason || "Ubicación no disponible."
+        : !old ||
+            old.id !== r.expectedControllerId ||
+            old.email === r.email ||
+            (p!.control_version ?? 0) !== r.expectedControlVersion ||
+            cents(p!.current_property_value ?? 0) !==
+              cents(r.expectedPropertyValue ?? -1)
+          ? "El controlador o el valor cambiaron durante el pago."
+          : cents(amount) !== cents(r.amount) ||
+              cents(amount) < cents(policy.minimumOffer)
+            ? "El importe ya no cumple las condiciones actuales."
+            : undefined;
+  const at = new Date(now).toISOString();
+  const record = {
+    id: `takeover-${r.id}`,
+    property_id: r.propertyId,
+    reservation_id: r.id,
+    previous_controller_id: r.expectedControllerId!,
+    previous_value: r.expectedPropertyValue!,
+    takeover_amount: amount,
+    stripe_payment_id: stripePaymentId,
+    transaction_id: transactionId,
+    created_at: at,
+  };
+  s.transactions.push({
+    id: transactionId,
+    reservationId: r.id,
+    amount,
+    email: r.email,
+    createdAt: at,
+    provider,
+    stripePaymentId,
+    outcome: conflict
+      ? provider === "demo"
+        ? "refunded"
+        : "refund_pending"
+      : "fulfilled",
+  });
+  if (conflict) {
+    r.status = "conflict";
+    s.propertyTakeovers.push({
+      ...record,
+      status: provider === "demo" ? "refunded" : "refund_pending",
+      conflict_reason: conflict,
+    });
+    queueMail(
+      s,
+      r.email,
+      "Tu takeover de SkyCity no se ha completado",
+      `${conflict} No has obtenido esta ubicación. ${provider === "demo" ? "Pago de demostración anulado: no se ha cobrado dinero." : "Se tramitará la devolución íntegra de tu pago."}`,
+      `takeover-conflict:${r.id}`,
+    );
+    return undefined;
+  }
+  const lease = {
+    id: `lease-${r.id}`,
+    propertyId: r.propertyId,
+    email: r.email,
+    ad: r.ad,
+    startsAt: at,
+    status: "active" as const,
+    demo: provider === "demo",
+    autoRenew: false,
+    transferable: false,
+    presenceTier: old!.presenceTier || ("STARTER" as const),
+    upgradeHistory: [],
+  };
+  old!.status = "expired";
+  s.leases.push(lease);
+  b!.leaseId = lease.id;
+  p!.current_property_value = amount;
+  p!.last_takeover_amount = amount;
+  p!.last_takeover_at = at;
+  p!.takeover_count = (p!.takeover_count || 0) + 1;
+  p!.control_version = (p!.control_version || 0) + 1;
+  p!.protection_until = new Date(
+    now + protectionHours(s) * 3600000,
+  ).toISOString();
+  r.status = "paid";
+  s.propertyTakeovers.push({
+    ...record,
+    new_controller_id: lease.id,
+    status: "completed",
+  });
+  queueMail(
+    s,
+    old!.email,
+    "Tu edificio de SkyCity ha cambiado de manos.",
+    `Solar #${p!.number}\nValor anterior: ${record.previous_value} €\nNuevo valor: ${amount} €\nTu marca ya no controla esta ubicación.`,
+    `takeover-previous:${r.id}`,
+  );
+  queueMail(
+    s,
+    lease.email,
+    "Ya controlas esta ubicación de SkyCity",
+    `Solar #${p!.number} · Valor actual: ${amount} €. El edificio conserva su tamaño y tier. Controlarás esta ubicación mientras nadie supere el importe que has pagado. Protegido hasta ${p!.protection_until}. Entra en Mis edificios para editar tu marca.`,
+    `confirmation:takeover-${r.id}`,
+  );
   return lease;
 }
 export function placeBid(

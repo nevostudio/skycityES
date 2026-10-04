@@ -11,6 +11,7 @@ export default function Page() {
   const [demo, setDemo] = useState(false);
   const [share, setShare] = useState(false);
   const [error, setError] = useState("");
+  const [takeover, setTakeover] = useState(false);
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     let done = false;
@@ -18,14 +19,24 @@ export default function Page() {
       try {
         const status = await api<{
           status: string;
+          purpose?: string;
+          takeover?: string;
           lease?: { propertyId: string };
         }>(`/api/checkout/status?${q}`);
         if (status.status === "paid" && status.lease) {
+          setTakeover(status.purpose === "takeover");
           const data = await api<CityData>("/api/city");
           setDemo(data.demo);
           setP(
             data.properties.find((p) => p.id === status.lease!.propertyId) ||
               null,
+          );
+          done = true;
+        } else if (status.status === "conflict") {
+          setError(
+            status.takeover === "refunded"
+              ? "Otra operación cambió el control de esta ubicación. Tu pago se ha devuelto íntegramente."
+              : "No has obtenido esta ubicación porque sus condiciones cambiaron durante el pago. Se está tramitando la devolución íntegra.",
           );
           done = true;
         } else if (status.status === "expired") {
@@ -55,7 +66,9 @@ export default function Page() {
         >
           {p ? (
             <>
-              <span className="eyebrow">EDIFICIO CONSTRUIDO</span>
+              <span className="eyebrow">
+                {takeover ? "CONTROL CONFIRMADO" : "EDIFICIO CONSTRUIDO"}
+              </span>
               <h1>Ya estás en SkyCity.</h1>
               <PropertyArt property={p} brand={p.ad?.brand} />
               <h2>{p.name}</h2>
@@ -64,9 +77,11 @@ export default function Page() {
               </p>
               <Link
                 className="button coral wide"
-                href={`/?building=${p.id}&obra=1`}
+                href={`/?building=${p.id}${takeover ? "" : "&obra=1"}`}
               >
-                Verlo construirse en la ciudad ↗
+                {takeover
+                  ? "Ver mi marca en la ciudad ↗"
+                  : "Verlo construirse en la ciudad ↗"}
               </Link>
               <Link className="button outline wide" href={propertyUrl(p)}>
                 Página de mi edificio

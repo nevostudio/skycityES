@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import { PLOT_HEIGHT } from "./presence";
 import { isLaunchNormalPlot } from "./inventory";
+import { migrateTakeovers } from "./takeover-policy";
 import {
   DEMO_DESCRIPTION,
   DEMO_SHOWCASE,
@@ -155,7 +156,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
         { id: `bld-${l.id}`, leaseId: l.id, demo: true },
       ),
     );
-  return {
+  return migrateTakeovers({
     properties,
     districts: structuredClone(districts),
     leases,
@@ -181,6 +182,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
       demo: true,
     })),
     transactions: [],
+    propertyTakeovers: [],
     analytics: [],
     access: [],
     mail: [],
@@ -196,5 +198,5 @@ export function makeSeed(demo = true, now = Date.now()): State {
         inventoryVersion: 1,
       },
     ],
-  };
+  });
 }

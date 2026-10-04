@@ -19,6 +19,7 @@ import type {
   Settings,
   Mail,
   CityData,
+  PropertyTakeover,
 } from "@/types";
 import { Header } from "../header";
 import { Login } from "../dashboard/login";
@@ -32,6 +33,7 @@ const tabs = [
   "Pujas",
   "Clientes",
   "Transacciones",
+  "Takeovers",
   "Correos",
   "Ajustes",
 ];
@@ -50,6 +52,7 @@ type AdminData = {
   auctions: Auction[];
   bids: Bid[];
   transactions: Transaction[];
+  propertyTakeovers: PropertyTakeover[];
   settings: Settings;
   mail: Mail[];
   stats: CityData["stats"];
@@ -500,7 +503,10 @@ export function Admin({ demo }: { demo: boolean }) {
                         {t.provider} · {t.id}
                       </small>
                     </div>
-                    <strong>{euro(t.amount)}</strong>
+                    <strong>
+                      {euro(t.amount)}
+                      {t.outcome && <small>{t.outcome}</small>}
+                    </strong>
                   </div>
                 ))}
                 {!data.transactions.length && (
@@ -529,6 +535,37 @@ export function Admin({ demo }: { demo: boolean }) {
                 )}
               </div>
             )}
+            {tab === "Takeovers" && (
+              <div className="admin-records">
+                {data.propertyTakeovers.length === 0 && (
+                  <p>No hay takeovers registrados.</p>
+                )}
+                {data.propertyTakeovers
+                  .slice()
+                  .reverse()
+                  .map((t) => (
+                    <article className="admin-record" key={t.id}>
+                      <div>
+                        <strong>
+                          {t.property_id} · {euro(t.previous_value)} →{" "}
+                          {euro(t.takeover_amount)}
+                        </strong>
+                        <p>
+                          {t.previous_controller_id} →{" "}
+                          {t.new_controller_id || "Sin transferencia"}
+                        </p>
+                        <small>
+                          {t.status} ·{" "}
+                          {new Date(t.created_at).toLocaleString("es-ES")} ·{" "}
+                          {t.stripe_payment_id || "Demo"}
+                        </small>
+                        {t.conflict_reason && <p>{t.conflict_reason}</p>}
+                        {t.refund_id && <small>Reembolso: {t.refund_id}</small>}
+                      </div>
+                    </article>
+                  ))}
+              </div>
+            )}
             {tab === "Ajustes" && (
               <form
                 className="auth-card"
@@ -540,11 +577,50 @@ export function Admin({ demo }: { demo: boolean }) {
                     settings: {
                       reservationMinutes: Number(f.get("reservationMinutes")),
                       moderation: f.get("moderation"),
+                      takeoverEnabled: f.get("takeoverEnabled") === "on",
+                      takeoverMinimumIncrement: Number(
+                        f.get("takeoverMinimumIncrement"),
+                      ),
+                      takeoverProtectionHours: Number(
+                        f.get("takeoverProtectionHours"),
+                      ),
                     },
                   });
                 }}
               >
                 <h2>Ajustes de la ciudad.</h2>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="takeoverEnabled"
+                    defaultChecked={data.settings.takeoverEnabled}
+                  />
+                  Takeover global activado
+                </label>
+                <label>
+                  Incremento mínimo de takeover (€)
+                  <input
+                    name="takeoverMinimumIncrement"
+                    type="number"
+                    min="1"
+                    max="100000"
+                    step="0.01"
+                    defaultValue={data.settings.takeoverMinimumIncrement ?? 1}
+                    required
+                  />
+                </label>
+                <label>
+                  Horas de protección tras claim o takeover
+                  <input
+                    name="takeoverProtectionHours"
+                    type="number"
+                    min="0"
+                    max="8760"
+                    step="0.01"
+                    defaultValue={data.settings.takeoverProtectionHours ?? 24}
+                    required
+                  />
+                </label>
                 <p className="field-hint">
                   Edificios de pago único: STARTER 3 € · PLUS 7 € · PRO 15 € ·
                   PREMIUM 30 € · LANDMARK 60 €. Los rascacielos son inventario

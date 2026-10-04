@@ -16,11 +16,15 @@ export async function GET(req: Request) {
     return Response.json(
       {
         status: r.status,
-        purpose: r.upgradeLeaseId
-          ? "upgrade"
-          : r.renewalLeaseId
-            ? "renewal"
-            : "claim",
+        takeover: s.propertyTakeovers.find((t) => t.reservation_id === r.id)
+          ?.status,
+        purpose:
+          r.purpose ||
+          (r.upgradeLeaseId
+            ? "upgrade"
+            : r.renewalLeaseId
+              ? "renewal"
+              : "claim"),
         lease: lease
           ? {
               propertyId: lease.propertyId,

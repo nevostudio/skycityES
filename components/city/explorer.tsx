@@ -443,6 +443,7 @@ export function Explorer({
           )}
           {p && (
             <PropertyPanel
+              demo={data.demo}
               property={p}
               district={data.districts.find((d) => d.id === p.districtId)}
               owned={!!mine}

@@ -6,6 +6,7 @@ import { makeSeed } from "./seed";
 import { migratePresence } from "./presence";
 import { migrateBranding, migratePlots } from "./plots";
 import { migrateInventory } from "./inventory";
+import { migrateTakeovers } from "./takeover-policy";
 import { isDemo } from "./config";
 import type { State } from "@/types";
 
@@ -23,6 +24,7 @@ const tableMap: Record<keyof State, string> = {
   access: "access_tokens",
   mail: "email_outbox",
   settings: "platform_settings",
+  propertyTakeovers: "property_takeovers",
 };
 const globalDb = globalThis as unknown as {
   skySqlite?: DatabaseSync;
@@ -55,10 +57,13 @@ const isCurrent = (s: State) =>
   s.settings[0].pricingVersion === 1 &&
   s.settings[0].plotsVersion === 1 &&
   s.settings[0].brandingVersion === 1 &&
-  s.settings[0].inventoryVersion === 1;
+  s.settings[0].inventoryVersion === 1 &&
+  s.settings[0].takeoverVersion === 1;
 /** Versioned, additive migrations applied inside the write transaction. */
 export const migrate = (s: State) =>
-  migrateInventory(migrateBranding(migratePlots(migratePresence(s))));
+  migrateTakeovers(
+    migrateInventory(migrateBranding(migratePlots(migratePresence(s)))),
+  );
 /** All economic writes serialize inside a database transaction. No browser state is authoritative. */
 export async function transaction<T>(fn: (state: State) => T): Promise<T> {
   if (isDemo()) {
@@ -85,7 +90,8 @@ export async function transaction<T>(fn: (state: State) => T): Promise<T> {
     const state = {} as State;
     const before = new Map<string, string>();
     for (const key of Object.keys(tableMap) as (keyof State)[]) {
-      const rows = await sql`SELECT data FROM ${sql(tableMap[key])}`;
+      const rows =
+        await sql`SELECT data FROM ${sql(tableMap[key])} ORDER BY id FOR UPDATE`;
       (state[key] as unknown[]) = rows.map((r) => r.data);
       for (const row of rows)
         before.set(`${key}:${row.data.id}`, JSON.stringify(row.data));

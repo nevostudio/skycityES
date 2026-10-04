@@ -66,3 +66,9 @@ export const claimSchema = z.object({
     .enum(["STARTER", "PLUS", "PRO", "PREMIUM", "LANDMARK"])
     .default("STARTER"),
 });
+export const takeoverSchema = z.object({
+  propertyId: z.string().max(80),
+  email: emailSchema,
+  ad: adSchema,
+  offerAmount: z.number().positive().max(999999.99),
+});

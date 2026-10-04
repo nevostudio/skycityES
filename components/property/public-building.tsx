@@ -17,6 +17,7 @@ import { ShareModal } from "./share-modal";
 import { useCity } from "@/hooks/use-city";
 import { track } from "@/lib/analytics/client";
 import { euro, siteNote, statusLabel } from "@/lib/client";
+import { TakeoverCard } from "./takeover-card";
 export function PublicBuilding({
   initial,
   propertyId,
@@ -102,6 +103,7 @@ export function PublicBuilding({
                 <span>Pago único</span>
               </div>
             )}
+            <TakeoverCard key={p.id} property={p} demo={data.demo} />
             <div className="public-actions">
               {p.status === "available" ? (
                 <button

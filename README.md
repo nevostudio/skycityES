@@ -38,6 +38,23 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 - **Mis edificios → Editar marca**: nombre, frase, web, logo, color de acento, fondo del cartel e imagen publicitaria con su soporte, con vista previa del cartel.
 - NevoStudio es el ejemplo de referencia (`public/brands/`): wordmark transparente, acento `#ff4b00` y la frase «Encuentra tus próximos anunciantes».
 
+## Takeover automático (fase 3)
+
+- Cada solar guarda `current_property_value`: el último importe real pagado por controlarlo (claim inicial o takeover). Las mejoras de tamaño no cambian ese valor.
+- Cualquiera puede ofrecer más que el valor actual (incremento mínimo configurable, 1 € por defecto; nunca menos que construir en un solar libre). Si paga, pasa a controlar la ubicación automáticamente: sin aceptar, rechazar ni poner en venta.
+- SkyCity se queda el pago completo. El anterior controlador no recibe dinero, créditos ni compensación; recibe el aviso «Tu edificio de SkyCity ha cambiado de manos.».
+- El edificio, su altura y su tier se conservan; el nuevo controlador cambia la marca. Antes de pagar se muestran «Controlarás esta ubicación mientras nadie supere el importe que has pagado.» y «Si otra persona supera el valor actual, pasará automáticamente a controlar esta ubicación.».
+- Tras un claim o un takeover la ubicación queda PROTEGIDA durante `TAKEOVER_PROTECTION_HOURS` (24 h por defecto; el Ayuntamiento puede cambiarlo).
+- Excluidos: edificios públicos (incluido SkyCity HQ), solares reservados, rascacielos, subastas y propiedades bloqueadas. `takeover_enabled` y el bloqueo manual solo los cambia un administrador.
+- Historial en `property_takeovers` (controlador anterior y nuevo, valor anterior, importe, pago de Stripe, estado y fecha) y contadores `last_takeover_amount`, `last_takeover_at` y `takeover_count` en el solar.
+
+### Concurrencia y pagos
+
+- Cada checkout de takeover guarda el controlador, el valor y la versión de control esperados. Varios aspirantes pueden pagar a la vez; al liquidar, el servidor revalida dentro de la transacción (bloqueo de filas `FOR UPDATE` en PostgreSQL, transacción `IMMEDIATE` en SQLite) el controlador, el valor, la versión, la protección, los interruptores y el importe.
+- Solo el primer pago válido gana. Un pago que llega tarde queda en `conflict`, nunca sobrescribe al ganador y se **devuelve íntegramente**: el reembolso se registra antes de llamar a Stripe y se reintenta desde el webhook o el cron, con clave de idempotencia y búsqueda por metadatos.
+- El control solo se transfiere desde el backend tras un pago verificado (webhook firmado o sesión consultada a Stripe en el cron); `success_url` solo muestra el estado. Restricciones SQL: un controlador activo por solar, un edificio por lease, `stripe_payment_id` único y comprobaciones de importe y estado en el historial.
+- Migración: `supabase/migrations/20261004192421_automatic_property_takeovers.sql` y `migrateTakeovers` (versión `takeoverVersion`), que recupera el valor desde el pago de adquisición registrado. Sin pago verificable (demo o asignación manual) el valor queda en 0 € para revisión, y el mínimo de takeover nunca baja del precio de construir.
+
 ## Ejecutar
 
 Requisitos: Node.js **22.13+** (recomendado 24 LTS) y npm.

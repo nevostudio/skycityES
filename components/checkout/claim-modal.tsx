@@ -17,6 +17,7 @@ import { api, euro } from "@/lib/client";
 import { Modal } from "../modal";
 import { AdFields } from "./ad-fields";
 import { BuildingArt } from "../property/building-art";
+import { CONTROL_NOTICE, TRANSFER_NOTICE } from "@/lib/takeover-policy";
 type Checkout = {
   reservation: string;
   access: string;
@@ -37,6 +38,7 @@ export function ClaimModal({
   upgradeLeaseId,
   initialAd,
   email: initialEmail,
+  takeoverOffer,
 }: {
   property: PublicProperty;
   demo: boolean;
@@ -45,19 +47,25 @@ export function ClaimModal({
   upgradeLeaseId?: string;
   initialAd?: Ad;
   email?: string;
+  takeoverOffer?: number;
 }) {
   const [ad, setAd] = useState<Ad>(initialAd || { ...emptyAd });
   const [email, setEmail] = useState(initialEmail || "");
   const sky = p.inventory === "skyscraper";
+  const takeover = takeoverOffer !== undefined;
   const currentTier = p.presenceTier || "STARTER";
   const [presenceTier, setPresenceTier] = useState<PresenceTier>(
-    upgradeLeaseId
-      ? PRESENCE_TIERS[Math.min(4, presenceLevel(currentTier) + 1)]
-      : "STARTER",
+    takeover
+      ? currentTier
+      : upgradeLeaseId
+        ? PRESENCE_TIERS[Math.min(4, presenceLevel(currentTier) + 1)]
+        : "STARTER",
   );
-  const amount = upgradeLeaseId
-    ? upgradePrice(currentTier, presenceTier)
-    : claimPrice(p, presenceTier);
+  const amount = takeover
+    ? takeoverOffer
+    : upgradeLeaseId
+      ? upgradePrice(currentTier, presenceTier)
+      : claimPrice(p, presenceTier);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [checkout, setCheckout] = useState<Checkout | null>(null);
@@ -82,13 +90,17 @@ export function ClaimModal({
     setBusy(true);
     setError("");
     try {
-      const result = await api<Checkout>("/api/checkout", {
-        propertyId: p.id,
-        ad,
-        email,
-        upgradeLeaseId,
-        presenceTier,
-      });
+      const result = await api<Checkout>(
+        takeover ? "/api/takeover" : "/api/checkout",
+        {
+          propertyId: p.id,
+          ad,
+          email,
+          upgradeLeaseId,
+          presenceTier,
+          offerAmount: takeoverOffer,
+        },
+      );
       if (result.url) {
         location.assign(result.url);
         return;
@@ -120,31 +132,55 @@ export function ClaimModal({
   return (
     <Modal
       title={
-        checkout
-          ? "TU SOLAR ESTÁ RESERVADO"
-          : upgradeLeaseId
-            ? "HAZ CRECER TU EDIFICIO"
-            : "CONSTRUYE AQUÍ"
+        takeover
+          ? "CONTROLAR ESTA UBICACIÓN"
+          : checkout
+            ? "TU SOLAR ESTÁ RESERVADO"
+            : upgradeLeaseId
+              ? "HAZ CRECER TU EDIFICIO"
+              : "CONSTRUYE AQUÍ"
       }
       onClose={onClose}
       className="claim-modal"
     >
       <div className="claim-heading">
         <h2>
-          {checkout
-            ? "Un último paso."
-            : upgradeLeaseId
-              ? "Más altura. Mismo solar."
-              : "Tu marca. Tu edificio."}
+          {takeover
+            ? "Tu marca. Este edificio."
+            : checkout
+              ? "Un último paso."
+              : upgradeLeaseId
+                ? "Más altura. Mismo solar."
+                : "Tu marca. Tu edificio."}
         </h2>
         <p>
-          {checkout
-            ? "En cuanto confirmes el pago, empieza la obra."
-            : upgradeLeaseId
-              ? "Tu marca y tu ubicación se quedan exactamente igual."
-              : "Un pequeño rincón de internet, construido para ti."}
+          {takeover
+            ? "El edificio mantiene su altura y tier. Personaliza la marca que se mostrará al completar el takeover."
+            : checkout
+              ? "En cuanto confirmes el pago, empieza la obra."
+              : upgradeLeaseId
+                ? "Tu marca y tu ubicación se quedan exactamente igual."
+                : "Un pequeño rincón de internet, construido para ti."}
         </p>
       </div>
+      {!sky && (
+        <div className="takeover-notice">
+          <strong>{CONTROL_NOTICE}</strong>
+          <p>{TRANSFER_NOTICE}</p>
+          <p>
+            Tras el pago tendrás {p.takeover?.protectionHours ?? 24} horas de
+            protección. El anterior controlador no recibe dinero ni
+            compensación.
+          </p>
+          {takeover && (
+            <p>
+              Tu importe se convertirá en el nuevo valor que deberá superar la
+              siguiente persona. Si el control cambia durante el pago, no
+              recibirás la ubicación y se devolverá íntegramente tu pago.
+            </p>
+          )}
+        </div>
+      )}
       <div className="claim-preview">
         <BuildingArt
           property={withBuilding(
@@ -182,7 +218,12 @@ export function ClaimModal({
           <p className="muted">
             <Mail size={14} /> {email}
           </p>
-          <p className="microcopy">Reservado durante {remaining}</p>
+          <p className="microcopy">
+            {takeover ? "Checkout válido durante" : "Reservado durante"}{" "}
+            {remaining}
+            {takeover &&
+              " · No reserva el control: se comprueba al confirmar el pago."}
+          </p>
           {error && (
             <p className="error" role="alert">
               {error}
@@ -206,7 +247,7 @@ export function ClaimModal({
         </div>
       ) : (
         <form onSubmit={submit}>
-          {!sky && (
+          {!sky && !takeover && (
             <PresenceSelector
               property={{ ...p, ad }}
               value={presenceTier}
@@ -261,7 +302,12 @@ export function ClaimModal({
               <Loader2 size={18} className="spin" />
             ) : (
               <>
-                {upgradeLeaseId ? "Mejorar" : "Construir"} por {euro(amount)}
+                {takeover
+                  ? "HACERME CON ESTA UBICACIÓN"
+                  : upgradeLeaseId
+                    ? "Mejorar"
+                    : "Construir"}{" "}
+                por {euro(amount)}
                 <Hammer size={18} />
               </>
             )}

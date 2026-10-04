@@ -43,7 +43,11 @@ export async function PATCH(req: Request) {
     const ad = adSchema.parse(input.ad);
     await transaction((s) => {
       const l = s.leases.find(
-        (l) => l.id === input.leaseId && l.email === user.email,
+        (l) =>
+          l.id === input.leaseId &&
+          l.email === user.email &&
+          l.status === "active" &&
+          s.buildings.some((b) => b.leaseId === l.id),
       );
       if (!l) throw new DomainError("Edificio no encontrado.", 404);
       l.ad = {

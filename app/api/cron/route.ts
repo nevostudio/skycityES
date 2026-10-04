@@ -1,9 +1,11 @@
 import { readState, transaction } from "@/lib/store";
-import { sweep, closeAuctions, fulfill } from "@/lib/engine";
+import { sweep, closeAuctions } from "@/lib/engine";
+import { settleStripeSession } from "@/lib/stripe/settlement";
 import { isDemo, appUrl } from "@/lib/config";
 import { stripe } from "@/lib/stripe";
 import { flushMail } from "@/lib/email";
 import { fail } from "@/lib/http";
+import { flushTakeoverRefunds } from "@/lib/stripe/refunds";
 export async function GET(req: Request) {
   if (
     !process.env.CRON_SECRET ||
@@ -31,21 +33,14 @@ export async function GET(req: Request) {
           session.payment_status === "paid" &&
           session.currency === "eur"
         )
-          await transaction((s) =>
-            fulfill(
-              s,
-              r.id,
-              session.id,
-              (session.amount_total || 0) / 100,
-              "stripe",
-            ),
-          );
+          await transaction((s) => settleStripeSession(s, session));
       }
     await transaction((s) => {
       sweep(s);
       closeAuctions(s, isDemo(), appUrl());
     });
     const mail = await flushMail();
+    await flushTakeoverRefunds();
     return Response.json({ ok: true, ...mail });
   } catch (e) {
     return fail(e);

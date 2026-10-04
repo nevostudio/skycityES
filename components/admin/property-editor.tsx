@@ -31,6 +31,50 @@ export function PropertyEditor({
             setEdit(null);
         }}
       >
+        <fieldset>
+          <legend>Control de la ubicación</legend>
+          <label>
+            Valor actual (€)
+            <input
+              type="number"
+              min="0"
+              max="999999.99"
+              step="0.01"
+              value={edit.current_property_value ?? 0}
+              onChange={(e) =>
+                setEdit({
+                  ...edit,
+                  current_property_value: Number(e.target.value),
+                })
+              }
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={!!edit.takeover_enabled}
+              disabled={edit.inventory !== "normal"}
+              onChange={(e) =>
+                setEdit({ ...edit, takeover_enabled: e.target.checked })
+              }
+            />
+            Permitir takeover
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={!!edit.takeover_blocked}
+              onChange={(e) =>
+                setEdit({ ...edit, takeover_blocked: e.target.checked })
+              }
+            />
+            Bloqueo manual de takeover
+          </label>
+          <small>
+            Los edificios públicos, administrativos, reservados y rascacielos
+            están excluidos.
+          </small>
+        </fieldset>
         <label>
           Nombre
           <input

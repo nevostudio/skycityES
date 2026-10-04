@@ -17,10 +17,12 @@ import { euro, propertyUrl, siteNote, statusLabel } from "@/lib/client";
 import { PRESENCE } from "@/lib/presence";
 import { track } from "@/lib/analytics/client";
 import { PropertyArt } from "./building-art";
+import { TakeoverCard } from "./takeover-card";
 export function PropertyPanel({
   property: p,
   district,
   owned = false,
+  demo = false,
   onClose,
   onClaim,
   onUpgrade,
@@ -29,6 +31,7 @@ export function PropertyPanel({
   property: PublicProperty;
   district?: District;
   owned?: boolean;
+  demo?: boolean;
   onClose: () => void;
   onClaim: () => void;
   onUpgrade?: () => void;
@@ -252,6 +255,7 @@ export function PropertyPanel({
             </div>
           </>
         )}
+        <TakeoverCard key={p.id} property={p} owned={owned} demo={demo} />
         <div className="panel-footer">
           <Link href={propertyUrl(p)}>
             {p.building ? "Ver página del edificio" : "Ver página del solar"}{" "}

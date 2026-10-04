@@ -88,6 +88,14 @@ export type Property = {
   premiumNote?: "major_brands" | "auction_soon";
   description?: string;
   baseHeight?: number;
+  current_property_value?: number;
+  takeover_enabled?: boolean;
+  takeover_blocked?: boolean;
+  protection_until?: string;
+  control_version?: number;
+  last_takeover_amount?: number;
+  last_takeover_at?: string;
+  takeover_count?: number;
 };
 /** Ownership + advertisement of a private building. One-time payment: no expiry. */
 export type Lease = {
@@ -132,7 +140,11 @@ export type Reservation = {
   days: number;
   amount: number;
   expiresAt: string;
-  status: "reserved" | "paid" | "expired";
+  status: "reserved" | "paid" | "expired" | "conflict";
+  purpose?: "takeover";
+  expectedControllerId?: string;
+  expectedPropertyValue?: number;
+  expectedControlVersion?: number;
   sessionId?: string;
   renewalLeaseId?: string;
   upgradeLeaseId?: string;
@@ -175,6 +187,23 @@ export type Transaction = {
   email: string;
   createdAt: string;
   provider: "demo" | "stripe";
+  stripePaymentId?: string;
+  outcome?: "fulfilled" | "refund_pending" | "refunded";
+};
+export type PropertyTakeover = {
+  id: string;
+  property_id: string;
+  reservation_id: string;
+  previous_controller_id: string;
+  new_controller_id?: string;
+  previous_value: number;
+  takeover_amount: number;
+  stripe_payment_id?: string;
+  transaction_id: string;
+  status: "completed" | "refund_pending" | "refunded";
+  conflict_reason?: string;
+  refund_id?: string;
+  created_at: string;
 };
 export type EventName =
   | "city_impression"
@@ -222,6 +251,10 @@ export type Settings = {
   plotsVersion?: number;
   brandingVersion?: number;
   inventoryVersion?: number;
+  takeoverVersion?: number;
+  takeoverEnabled?: boolean;
+  takeoverMinimumIncrement?: number;
+  takeoverProtectionHours?: number;
 };
 export type State = {
   properties: Property[];
@@ -237,6 +270,7 @@ export type State = {
   access: Access[];
   mail: Mail[];
   settings: Settings[];
+  propertyTakeovers: PropertyTakeover[];
 };
 export type PlotStatus =
   "available" | "reserved" | "claimed" | "auction" | "public";
@@ -255,6 +289,13 @@ export type PublicProperty = Property & {
   ad?: Ad;
   views: number;
   presenceTier?: PresenceTier;
+  takeover?: {
+    eligible: boolean;
+    open: boolean;
+    minimumOffer: number;
+    protectionHours: number;
+    reason?: string;
+  };
   auction?: Auction & {
     currentBid: number;
     nextBid: number;

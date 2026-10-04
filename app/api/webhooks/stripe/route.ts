@@ -1,10 +1,11 @@
 import { stripe } from "@/lib/stripe";
 import { transaction } from "@/lib/store";
-import { fulfill, DomainError } from "@/lib/engine";
+import { settleStripeSession } from "@/lib/stripe/settlement";
 import { isDemo } from "@/lib/config";
 import { fail } from "@/lib/http";
 import { after } from "next/server";
 import { flushMail } from "@/lib/email";
+import { flushTakeoverRefunds } from "@/lib/stripe/refunds";
 export async function POST(req: Request) {
   if (isDemo())
     return Response.json(
@@ -28,26 +29,8 @@ export async function POST(req: Request) {
     ) {
       const session = event.data.object;
       if (session.payment_status === "paid") {
-        if (session.currency !== "eur")
-          throw new DomainError("Moneda inesperada", 409);
-        await transaction((s) => {
-          const r = s.reservations.find(
-            (r) => r.id === session.metadata?.reservation_id,
-          );
-          if (
-            !r ||
-            r.propertyId !== session.metadata?.property_id ||
-            (r.sessionId && r.sessionId !== session.id)
-          )
-            throw new DomainError("Metadatos de pago no válidos", 409);
-          fulfill(
-            s,
-            r.id,
-            session.id,
-            (session.amount_total ?? 0) / 100,
-            "stripe",
-          );
-        });
+        await transaction((s) => settleStripeSession(s, session));
+        await flushTakeoverRefunds(session.metadata?.reservation_id);
       }
     } else if (event.type === "checkout.session.expired") {
       const session = event.data.object;

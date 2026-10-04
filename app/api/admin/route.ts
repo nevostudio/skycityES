@@ -15,6 +15,7 @@ import { adSchema, emailSchema } from "@/lib/validation";
 import { assignSkyscraper } from "@/lib/admin-inventory";
 import { PLOT_HEIGHT } from "@/lib/presence";
 import type { Ad } from "@/types";
+import { validMoney } from "@/lib/takeover-policy";
 const propertySchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2).max(80),
@@ -48,6 +49,9 @@ const propertySchema = z.object({
   reservedForBrands: z.boolean().default(false),
   premiumNote: z.enum(["major_brands", "auction_soon"]).optional(),
   description: z.string().max(180).optional(),
+  takeover_enabled: z.boolean().optional(),
+  takeover_blocked: z.boolean().optional(),
+  current_property_value: z.number().refine(validMoney).optional(),
 });
 export async function GET() {
   try {
@@ -62,13 +66,16 @@ export async function GET() {
         auctions: s.auctions,
         bids: s.bids,
         transactions: s.transactions,
+        propertyTakeovers: s.propertyTakeovers,
         settings: s.settings[0],
         mail: s.mail,
         stats: citySnapshot(s, isDemo()).stats,
         customers: [
           ...new Set(s.leases.filter((l) => !l.retired).map((l) => l.email)),
         ],
-        revenue: s.transactions.reduce((a, t) => a + t.amount, 0),
+        revenue: s.transactions
+          .filter((t) => !t.outcome || t.outcome === "fulfilled")
+          .reduce((a, t) => a + t.amount, 0),
         clicks: s.analytics
           .filter((e) => e.event === "external_link_click")
           .reduce((a, e) => a + e.count, 0),
@@ -128,14 +135,30 @@ export async function POST(req: Request) {
           throw new DomainError(
             "Un solar con edificio, reserva o subasta no puede desactivarse ni cambiar de tipo.",
           );
-        if (prev) Object.assign(prev, p);
-        else
+        if (p.inventory !== "normal") p.takeover_enabled = false;
+        if (prev) {
+          if (
+            (p.current_property_value !== undefined &&
+              p.current_property_value !== prev.current_property_value) ||
+            (p.takeover_enabled !== undefined &&
+              p.takeover_enabled !== prev.takeover_enabled) ||
+            (p.takeover_blocked !== undefined &&
+              p.takeover_blocked !== prev.takeover_blocked)
+          )
+            prev.control_version = (prev.control_version || 0) + 1;
+          Object.assign(prev, p);
+        } else
           s.properties.push({
             ...p,
             height: PLOT_HEIGHT,
             id: `building-${randomUUID()}`,
             number: Math.max(...s.properties.map((p) => p.number)) + 1,
             model: 0,
+            current_property_value: p.current_property_value ?? 0,
+            takeover_enabled: p.takeover_enabled ?? p.inventory === "normal",
+            takeover_blocked: p.takeover_blocked ?? false,
+            takeover_count: 0,
+            control_version: 0,
           });
       } else if (input.action === "assign-skyscraper") {
         const assignment = z
@@ -163,6 +186,14 @@ export async function POST(req: Request) {
           .object({
             reservationMinutes: z.number().int().min(1).max(30),
             moderation: z.enum(["automatic", "review"]),
+            takeoverEnabled: z.boolean().optional(),
+            takeoverMinimumIncrement: z
+              .number()
+              .min(1)
+              .max(100000)
+              .refine(validMoney)
+              .optional(),
+            takeoverProtectionHours: z.number().min(0).max(8760).optional(),
           })
           .parse(input.settings);
         Object.assign(s.settings[0], settings);

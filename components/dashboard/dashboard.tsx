@@ -28,6 +28,7 @@ import { ClaimModal } from "../checkout/claim-modal";
 import { Modal } from "../modal";
 import { AdFields } from "../checkout/ad-fields";
 import { useCity } from "@/hooks/use-city";
+import { TakeoverCard } from "../property/takeover-card";
 type MyLease = Lease & {
   property: Property;
   building: Building | null;
@@ -141,6 +142,7 @@ export function Dashboard({ initial }: { initial: CityData }) {
                       · {l.property.name}
                     </span>
                     <h2>{l.ad.brand}</h2>
+                    {p && <TakeoverCard property={p} owned />}
                     <span className="tag">
                       {tier === "SKYSCRAPER"
                         ? "RASCACIELOS"

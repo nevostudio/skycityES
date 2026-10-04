@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       if (!r || typeof access !== "string" || r.accessHash !== hash(access))
         throw new DomainError("Acceso al pago no válido.", 403);
       const lease = fulfill(s, r.id, `demo-${r.id}`, r.amount, "demo");
+      if (!lease || lease.status !== "active") return undefined;
       s.access.push({
         id: hash(session),
         email: r.email,
@@ -24,6 +25,11 @@ export async function POST(req: Request) {
       });
       return lease;
     });
+    if (!lease)
+      throw new DomainError(
+        "El control de esta ubicación ha cambiado. Tu pago de demostración se ha anulado.",
+        409,
+      );
     (await cookies()).set("skycity-session", session, {
       httpOnly: true,
       sameSite: "lax",
