@@ -5,14 +5,14 @@ import "./immersive.css";
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl()),
   title: {
-    default: "SkyCity — Put your brand on the map.",
+    default: "SkyCity — Construye tu marca en el mapa.",
     template: "%s · SkyCity",
   },
   description:
-    "A city of possibilities. Explore a living virtual city, claim a building, and give your brand a place on the map.",
+    "Una ciudad por construir. Elige un solar, levanta tu edificio desde 3 € y dale a tu marca un sitio en el mapa.",
   openGraph: {
-    title: "SkyCity — Put your brand on the map.",
-    description: "A little corner of the internet, made yours.",
+    title: "SkyCity — Construye tu marca en el mapa.",
+    description: "Un pequeño rincón de internet, construido para ti.",
     type: "website",
   },
   robots: { index: true, follow: true },
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body>{children}</body>
     </html>
   );

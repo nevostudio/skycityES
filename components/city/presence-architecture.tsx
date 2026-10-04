@@ -1,53 +1,17 @@
 "use client";
-import { useEffect, useMemo } from "react";
-import * as THREE from "three";
 import type { PublicProperty } from "@/types";
 import { presenceLevel } from "@/lib/presence";
 
-function ReservedSign({ p }: { p: PublicProperty }) {
-  const texture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 768;
-    const c = canvas.getContext("2d")!;
-    c.fillStyle = "#223937";
-    c.fillRect(0, 0, 512, 768);
-    c.strokeStyle = "#cfb377";
-    c.lineWidth = 8;
-    c.strokeRect(20, 20, 472, 728);
-    c.fillStyle = "#e9d59c";
-    c.textAlign = "center";
-    c.font = "32px sans-serif";
-    c.fillText("SKYCITY", 256, 160);
-    c.font = "bold 58px sans-serif";
-    c.fillText("RESERVED", 256, 352, 445);
-    c.font = "32px sans-serif";
-    c.fillText("FOR MAJOR", 256, 435);
-    c.fillText("BRANDS", 256, 484);
-    c.fillRect(216, 572, 80, 3);
-    const t = new THREE.CanvasTexture(canvas);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }, []);
-  useEffect(() => () => texture.dispose(), [texture]);
-  return (
-    <mesh position={[0, p.height * 0.65, p.depth / 2 + 0.09]}>
-      <planeGeometry args={[p.width * 0.93, p.width * 1.4]} />
-      <meshBasicMaterial map={texture} toneMapped={false} />
-    </mesh>
-  );
-}
-
 /** Three reusable roof languages, shared across property types, inside the existing plot. */
 export function PresenceArchitecture({ p }: { p: PublicProperty }) {
-  const sky = p.inventory === "skyscraper";
-  const level = sky ? 5 : presenceLevel(p.presenceTier);
+  const sky = p.building?.tier === "SKYSCRAPER";
+  const level = presenceLevel(p.building?.tier);
   const h = p.height,
     w = p.width,
     d = p.depth;
   const accent = p.ad?.primary || (sky ? "#c8af76" : "#78958a");
   return (
-    <group name={`presence-${p.presenceTier || "STARTER"}-${p.id}`}>
+    <group name={`presence-${p.building?.tier || "EMPTY"}-${p.id}`}>
       {level >= 3 && (
         <>
           {(p.model % 3 === 0 ? [0, 1] : [0]).map((i) => (
@@ -123,9 +87,6 @@ export function PresenceArchitecture({ p }: { p: PublicProperty }) {
             roughness={0.35}
           />
         </mesh>
-      )}
-      {sky && p.reservedForBrands && p.status === "reserved" && (
-        <ReservedSign p={p} />
       )}
     </group>
   );

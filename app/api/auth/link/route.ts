@@ -23,7 +23,8 @@ export async function POST(req: Request) {
       return Response.json({
         demo: true,
         url: `/auth/confirm?token=${secret}`,
-        message: "Demo mailbox: open your single-use access link below.",
+        message:
+          "Buzón de demostración: abre abajo tu enlace de acceso de un solo uso.",
       });
     }
     const { error } = await (
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     });
     if (error) throw error;
     return Response.json({
-      message: "Check your email for a secure access link.",
+      message: "Revisa tu correo: te hemos enviado un enlace de acceso seguro.",
     });
   } catch (e) {
     return fail(e);

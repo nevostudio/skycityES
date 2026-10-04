@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import postgres from "postgres";
 import { makeSeed } from "./seed";
 import { migratePresence } from "./presence";
+import { migratePlots } from "./plots";
 import { isDemo } from "./config";
 import type { State } from "@/types";
 
@@ -11,6 +12,7 @@ const tableMap: Record<keyof State, string> = {
   properties: "properties",
   districts: "districts",
   leases: "leases",
+  buildings: "buildings",
   reservations: "property_reservations",
   auctions: "auctions",
   bids: "bids",
@@ -48,6 +50,10 @@ function pg() {
     ssl: "require",
   }));
 }
+const isCurrent = (s: State) =>
+  s.settings[0].pricingVersion === 1 && s.settings[0].plotsVersion === 1;
+/** Versioned, additive migrations applied inside the write transaction. */
+export const migrate = (s: State) => migratePlots(migratePresence(s));
 /** All economic writes serialize inside a database transaction. No browser state is authoritative. */
 export async function transaction<T>(fn: (state: State) => T): Promise<T> {
   if (isDemo()) {
@@ -57,7 +63,7 @@ export async function transaction<T>(fn: (state: State) => T): Promise<T> {
       const row = db
         .prepare("SELECT data FROM city_state WHERE id=1")
         .get() as { data: string };
-      const state = migratePresence(JSON.parse(row.data) as State);
+      const state = migrate(JSON.parse(row.data) as State);
       const result = fn(state);
       db.prepare("UPDATE city_state SET data=? WHERE id=1").run(
         JSON.stringify(state),
@@ -80,7 +86,7 @@ export async function transaction<T>(fn: (state: State) => T): Promise<T> {
         before.set(`${key}:${row.data.id}`, JSON.stringify(row.data));
     }
     if (!state.settings.length) Object.assign(state, makeSeed(false));
-    migratePresence(state);
+    migrate(state);
     const out = fn(state);
     for (const key of Object.keys(tableMap) as (keyof State)[])
       for (const item of state[key]) {
@@ -97,9 +103,7 @@ export async function readState() {
       .prepare("SELECT data FROM city_state WHERE id=1")
       .get() as { data: string };
     const state = JSON.parse(row.data) as State;
-    return state.settings[0].pricingVersion === 1
-      ? state
-      : transaction((s) => s);
+    return isCurrent(state) ? state : transaction((s) => s);
   }
   return transaction((s) => s);
 }

@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ArrowRight, ShieldCheck, Check, Loader2, Mail } from "lucide-react";
+import { ShieldCheck, Check, Loader2, Mail, Hammer } from "lucide-react";
 import type { Ad, PublicProperty, PresenceTier } from "@/types";
 import {
   PRESENCE,
   PRESENCE_TIERS,
   claimPrice,
   presenceLevel,
-  visualProperty,
+  upgradePrice,
+  withBuilding,
 } from "@/lib/presence";
+import { DISTRICTS_ES } from "@/lib/plots";
 import { PresenceSelector } from "./presence-selector";
 import { emptyAd } from "@/lib/seed";
 import { api, euro } from "@/lib/client";
@@ -23,41 +25,39 @@ type Checkout = {
   demo: boolean;
   url?: string;
 };
+/**
+ * Explore → choose plot → BUILD HERE → size → customize → email → payment.
+ * With upgradeLeaseId the same flow grows an existing building and charges only the difference.
+ */
 export function ClaimModal({
   property: p,
-  durations,
   demo,
   onClose,
   onComplete,
-  renewalLeaseId,
   upgradeLeaseId,
   initialAd,
   email: initialEmail,
 }: {
   property: PublicProperty;
-  durations: number[];
   demo: boolean;
   onClose: () => void;
   onComplete: () => void;
-  renewalLeaseId?: string;
   upgradeLeaseId?: string;
   initialAd?: Ad;
   email?: string;
 }) {
   const [ad, setAd] = useState<Ad>(initialAd || { ...emptyAd });
   const [email, setEmail] = useState(initialEmail || "");
-  const [days, setDays] = useState(durations.includes(30) ? 30 : durations[0]);
+  const sky = p.inventory === "skyscraper";
   const currentTier = p.presenceTier || "STARTER";
   const [presenceTier, setPresenceTier] = useState<PresenceTier>(
     upgradeLeaseId
       ? PRESENCE_TIERS[Math.min(4, presenceLevel(currentTier) + 1)]
-      : renewalLeaseId
-        ? currentTier
-        : "STARTER",
+      : "STARTER",
   );
   const amount = upgradeLeaseId
-    ? PRESENCE[presenceTier].price - PRESENCE[currentTier].price
-    : claimPrice(p, presenceTier, days);
+    ? upgradePrice(currentTier, presenceTier)
+    : claimPrice(p, presenceTier);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [checkout, setCheckout] = useState<Checkout | null>(null);
@@ -86,8 +86,6 @@ export function ClaimModal({
         propertyId: p.id,
         ad,
         email,
-        days,
-        renewalLeaseId,
         upgradeLeaseId,
         presenceTier,
       });
@@ -118,16 +116,15 @@ export function ClaimModal({
       setBusy(false);
     }
   }
+  const tierLabel = sky ? "RASCACIELOS" : presenceTier;
   return (
     <Modal
       title={
         checkout
-          ? "YOUR SPOT IS RESERVED"
+          ? "TU SOLAR ESTÁ RESERVADO"
           : upgradeLeaseId
-            ? "GROW YOUR PRESENCE"
-            : renewalLeaseId
-              ? "STAY A LITTLE LONGER"
-              : "MAKE YOURSELF AT HOME"
+            ? "HAZ CRECER TU EDIFICIO"
+            : "CONSTRUYE AQUÍ"
       }
       onClose={onClose}
       className="claim-modal"
@@ -135,34 +132,33 @@ export function ClaimModal({
       <div className="claim-heading">
         <h2>
           {checkout
-            ? "One last step."
+            ? "Un último paso."
             : upgradeLeaseId
-              ? "A bigger presence. Same place."
-              : renewalLeaseId
-                ? "Keep your place."
-                : "Your brand. Your building."}
+              ? "Más altura. Mismo solar."
+              : "Tu marca. Tu edificio."}
         </h2>
         <p>
           {checkout
-            ? "Your new neighbors are waiting."
+            ? "En cuanto confirmes el pago, empieza la obra."
             : upgradeLeaseId
-              ? "Your brand and lease dates stay exactly as they are."
-              : "A little corner of the internet, made yours."}
+              ? "Tu marca y tu ubicación se quedan exactamente igual."
+              : "Un pequeño rincón de internet, construido para ti."}
         </p>
       </div>
       <div className="claim-preview">
         <BuildingArt
-          property={visualProperty({ ...p, color: ad.primary }, presenceTier)}
-          brand={ad.brand || "YOUR BRAND"}
+          property={withBuilding(
+            { ...p, color: ad.primary },
+            sky ? "SKYSCRAPER" : presenceTier,
+          )}
+          brand={ad.brand || "TU MARCA"}
         />
         <div>
-          <span className="eyebrow">{p.districtId.replaceAll("-", " ")}</span>
-          <h3>{p.name}</h3>
-          <span className="tag">
-            {p.inventory === "skyscraper"
-              ? "EXCLUSIVE SKYSCRAPER"
-              : presenceTier}
+          <span className="eyebrow">
+            {DISTRICTS_ES[p.districtId]?.name || p.districtId}
           </span>
+          <h3>{p.name}</h3>
+          <span className="tag">{tierLabel}</span>
         </div>
       </div>
       {checkout ? (
@@ -170,10 +166,8 @@ export function ClaimModal({
           <div className="notice">
             <ShieldCheck size={20} />
             <div>
-              <strong>Demo checkout · no charge</strong>
-              <p>
-                This simulates a successful payment. No card details needed.
-              </p>
+              <strong>Pago de demostración · sin cargo</strong>
+              <p>Simula un pago correcto. No hace falta tarjeta.</p>
             </div>
           </div>
           <div className="receipt">
@@ -181,14 +175,14 @@ export function ClaimModal({
               {ad.brand} ·{" "}
               {upgradeLeaseId
                 ? `${currentTier} → ${presenceTier}`
-                : `${days} days`}
+                : `Edificio ${tierLabel}`}
             </span>
             <strong>{euro(checkout.amount)}</strong>
           </div>
           <p className="muted">
             <Mail size={14} /> {email}
           </p>
-          <p className="microcopy">Reserved for {remaining}</p>
+          <p className="microcopy">Reservado durante {remaining}</p>
           {error && (
             <p className="error" role="alert">
               {error}
@@ -204,15 +198,15 @@ export function ClaimModal({
             ) : (
               <Check size={18} />
             )}
-            {upgradeLeaseId ? "Complete demo upgrade" : "Complete demo claim"}
+            {upgradeLeaseId
+              ? "Completar mejora de demostración"
+              : "Completar pago de demostración"}
           </button>
-          <p className="microcopy">
-            A temporary advertising lease. No recurring charges.
-          </p>
+          <p className="microcopy">Pago único. Sin cargos recurrentes.</p>
         </div>
       ) : (
         <form onSubmit={submit}>
-          {p.inventory !== "skyscraper" && !renewalLeaseId && (
+          {!sky && (
             <PresenceSelector
               property={{ ...p, ad }}
               value={presenceTier}
@@ -225,47 +219,32 @@ export function ClaimModal({
               <span>
                 {currentTier} {euro(PRESENCE[currentTier].price)} →{" "}
                 {presenceTier} {euro(PRESENCE[presenceTier].price)}
-                <small>
-                  Same location · expires{" "}
-                  {new Date(p.expiresAt!).toLocaleDateString("en-GB")}
-                </small>
+                <small>Mismo solar · el edificio crece</small>
               </span>
-              <strong>Pay {euro(amount)}</strong>
+              <strong>Pagas {euro(amount)}</strong>
             </div>
           ) : (
-            <fieldset className="duration-fieldset">
-              <legend>Choose your stay</legend>
-              <div className="duration-options">
-                {durations
-                  .filter((d) => p.prices[String(d)])
-                  .map((d) => (
-                    <button
-                      type="button"
-                      key={d}
-                      className={d === days ? "selected" : ""}
-                      onClick={() => setDays(d)}
-                    >
-                      <strong>{d} days</strong>
-                      <span>{euro(claimPrice(p, presenceTier, d))}</span>
-                      {d === 30 && <small>NO RECURRING CHARGE</small>}
-                    </button>
-                  ))}
-              </div>
-            </fieldset>
+            <>
+              <h3 className="form-step">
+                {sky
+                  ? "1. Personaliza tu rascacielos"
+                  : "2. Personaliza tu edificio"}
+              </h3>
+              <AdFields ad={ad} onChange={setAd} />
+            </>
           )}
-          {!upgradeLeaseId && <AdFields ad={ad} onChange={setAd} />}
           <label>
-            Your email
+            {upgradeLeaseId ? "Tu email" : sky ? "2. Tu email" : "3. Tu email"}
             <input
               type="email"
               required
               value={email}
-              readOnly={!!renewalLeaseId || !!upgradeLeaseId}
+              readOnly={!!upgradeLeaseId}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="tu@email.com"
             />
             <small className="field-hint">
-              Your receipt and secure access link. No password, ever.
+              Tu recibo y un enlace de acceso seguro. Sin contraseñas.
             </small>
           </label>
           {error && (
@@ -278,28 +257,23 @@ export function ClaimModal({
               <Loader2 size={18} className="spin" />
             ) : (
               <>
-                {" "}
-                {upgradeLeaseId
-                  ? "Upgrade"
-                  : renewalLeaseId
-                    ? "Renew"
-                    : "Claim"}{" "}
-                for {euro(amount)}
-                <ArrowRight size={18} />
+                {upgradeLeaseId ? "Mejorar" : "Construir"} por {euro(amount)}
+                <Hammer size={18} />
               </>
             )}
           </button>
           <p className="microcopy">
             <ShieldCheck size={13} />
             {demo
-              ? "Demo checkout · no real payment"
-              : "Secure checkout powered by Stripe"}{" "}
-            · {upgradeLeaseId ? "Existing expiry unchanged" : `${days} days`}
+              ? "Pago de demostración · sin cobro real"
+              : "Pago seguro con Stripe"}{" "}
+            · Pago único
           </p>
           <p className="fine-print">
-            By continuing, you agree to a temporary advertising placement. You
-            must own the rights to your content. Illegal or harmful ads may be
-            suspended.
+            Al continuar aceptas mostrar tu marca en SkyCity. Debes tener los
+            derechos de tu contenido; los anuncios ilegales o dañinos pueden
+            suspenderse. Un edificio en SkyCity es un espacio publicitario
+            virtual, no una propiedad inmobiliaria ni una inversión.
           </p>
         </form>
       )}

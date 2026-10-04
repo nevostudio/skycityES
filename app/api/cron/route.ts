@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     !process.env.CRON_SECRET ||
     req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`
   )
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return Response.json({ error: "No autorizado" }, { status: 401 });
   try {
     if (!isDemo())
       for (const r of (await readState()).reservations

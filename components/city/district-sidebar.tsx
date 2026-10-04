@@ -20,8 +20,8 @@ export function DistrictSidebar({
     setSidebar(false);
   };
   return (
-    <div className="district-menu" aria-label="Choose a neighborhood">
-      <span className="eyebrow">SEVEN NEIGHBORHOODS. ONE CITY.</span>
+    <div className="district-menu" aria-label="Elige un barrio">
+      <span className="eyebrow">SIETE BARRIOS. UNA CIUDAD.</span>
       <button
         className={district === "all" ? "selected" : ""}
         onClick={() => select("all")}
@@ -30,8 +30,11 @@ export function DistrictSidebar({
           <Globe2 size={18} />
         </span>
         <span>
-          <strong>All of SkyCity</strong>
-          <small>{data.stats.available} spots waiting for an idea</small>
+          <strong>Toda SkyCity</strong>
+          <small>
+            {data.stats.available} solares esperando una idea ·{" "}
+            {data.stats.builtPercent}% construido
+          </small>
         </span>
         {district === "all" && <Check size={15} />}
       </button>
@@ -55,7 +58,7 @@ export function DistrictSidebar({
                   (p) => p.districtId === d.id && p.status === "available",
                 ).length
               }{" "}
-              available · {d.subtitle}
+              libres · {d.subtitle}
             </small>
           </span>
           {district === d.id ? <Check size={15} /> : <ArrowUpRight size={14} />}

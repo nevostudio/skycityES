@@ -6,15 +6,22 @@ import {
   ArrowUpRight,
   LogOut,
   Pencil,
-  RefreshCw,
   Share2,
   Loader2,
+  TrendingUp,
 } from "lucide-react";
-import type { Ad, CityData, Lease, Property, PublicProperty } from "@/types";
+import type {
+  Ad,
+  Building,
+  CityData,
+  Lease,
+  Property,
+  PublicProperty,
+} from "@/types";
 import { Header } from "../header";
 import { Login } from "./login";
-import { api, euro } from "@/lib/client";
-import { visualProperty } from "@/lib/presence";
+import { api, euro, shortDate } from "@/lib/client";
+import { withBuilding } from "@/lib/presence";
 import { BuildingArt } from "../property/building-art";
 import { ShareModal } from "../property/share-modal";
 import { ClaimModal } from "../checkout/claim-modal";
@@ -23,11 +30,19 @@ import { AdFields } from "../checkout/ad-fields";
 import { useCity } from "@/hooks/use-city";
 type MyLease = Lease & {
   property: Property;
+  building: Building | null;
   analytics: Record<string, number>;
 };
 type Me = {
   user: { email: string; admin: boolean } | null;
   leases?: MyLease[];
+};
+const adStatus: Record<string, string> = {
+  active: "activo",
+  pending: "en revisión",
+  draft: "borrador",
+  rejected: "rechazado",
+  suspended: "suspendido",
 };
 export function Dashboard({ initial }: { initial: CityData }) {
   const { data, refresh } = useCity(initial);
@@ -35,8 +50,8 @@ export function Dashboard({ initial }: { initial: CityData }) {
   const [error, setError] = useState("");
   const [edit, setEdit] = useState<MyLease | null>(null);
   const [ad, setAd] = useState<Ad | null>(null);
-  const [renew, setRenew] = useState<MyLease | null>(null);
   const [upgrade, setUpgrade] = useState<MyLease | null>(null);
+  const [grown, setGrown] = useState<string | null>(null);
   const [share, setShare] = useState<PublicProperty | null>(null);
   const [busy, setBusy] = useState(false);
   async function load() {
@@ -49,27 +64,28 @@ export function Dashboard({ initial }: { initial: CityData }) {
   useEffect(() => {
     void load();
   }, []);
+  const standing = me?.leases?.filter((l) => l.status === "active") || [];
   return (
     <>
       <Header demo={data.demo} />
       <main className="page-shell">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">YOUR CORNER OF THE CITY</span>
+            <span className="eyebrow">TU RINCÓN DE LA CIUDAD</span>
             <h1>
-              My buildings<span>.</span>
+              Mis edificios<span>.</span>
             </h1>
             <p>
               {me?.user
-                ? `Good to see you, ${me.user.email}.`
-                : "Make yourself at home."}
+                ? `Qué alegría verte, ${me.user.email}.`
+                : "Estás en tu casa."}
             </p>
           </div>
           {me?.user && (
             <div className="card-actions">
               {me.user.admin && (
                 <Link className="button outline" href="/admin">
-                  City Hall
+                  Ayuntamiento
                 </Link>
               )}
               <button
@@ -80,7 +96,7 @@ export function Dashboard({ initial }: { initial: CityData }) {
                 }}
               >
                 <LogOut size={14} />
-                Sign out
+                Cerrar sesión
               </button>
             </div>
           )}
@@ -90,73 +106,78 @@ export function Dashboard({ initial }: { initial: CityData }) {
             {error}
           </p>
         )}
+        {grown && (
+          <div className="notice" role="status">
+            Tu edificio ha crecido.{" "}
+            <Link href={`/?building=${grown}&obra=1`}>
+              Verlo crecer en la ciudad ↗
+            </Link>
+          </div>
+        )}
         {!me ? (
-          <p className="muted">Opening your buildings…</p>
+          <p className="muted">Abriendo tus edificios…</p>
         ) : !me.user ? (
           <Login demo={data.demo} />
-        ) : me.leases?.length ? (
+        ) : standing.length ? (
           <div className="dashboard-grid">
-            {me.leases.map((l) => {
+            {standing.map((l) => {
               const p = data.properties.find((p) => p.id === l.propertyId);
-              const days = Math.max(
-                0,
-                Math.ceil((Date.parse(l.expiresAt) - Date.now()) / 86400000),
-              );
+              const tier = l.building?.tier || l.presenceTier || "STARTER";
               const opens = l.analytics.property_open || 0;
               const clicks = l.analytics.external_link_click || 0;
               return (
                 <article className="lease-card" key={l.id}>
                   <BuildingArt
-                    property={visualProperty(l.property, l.presenceTier)}
+                    property={withBuilding(l.property, tier)}
                     brand={l.ad.brand}
                   />
                   <div className="lease-details">
                     <span className="eyebrow">
-                      {l.property.districtId.replaceAll("-", " ")} ·{" "}
-                      {l.property.name}
+                      {
+                        data.districts.find(
+                          (d) => d.id === l.property.districtId,
+                        )?.name
+                      }{" "}
+                      · {l.property.name}
                     </span>
                     <h2>{l.ad.brand}</h2>
                     <span className="tag">
-                      {l.property.inventory === "skyscraper"
-                        ? "EXCLUSIVE SKYSCRAPER"
-                        : `${l.presenceTier || "STARTER"} PRESENCE`}
+                      {tier === "SKYSCRAPER"
+                        ? "RASCACIELOS"
+                        : `EDIFICIO ${tier}`}
                     </span>
                     <p>
-                      {days ? `${days} days remaining` : "Lease expired"} · Ad{" "}
-                      {l.ad.status}
+                      Construido el{" "}
+                      {shortDate(l.building?.builtAt || l.startsAt)} · Pago
+                      único · Anuncio {adStatus[l.ad.status] || l.ad.status}
                     </p>
                     <div className="stats-row">
                       <div>
                         <strong>{l.analytics.property_impression || 0}</strong>
-                        <small>Impressions</small>
+                        <small>Impresiones</small>
                       </div>
                       <div>
                         <strong>{opens}</strong>
-                        <small>Profile views</small>
+                        <small>Visitas a la ficha</small>
                       </div>
                       <div>
                         <strong>{clicks}</strong>
-                        <small>Website clicks</small>
+                        <small>Clics a la web</small>
                       </div>
                     </div>
                     <p>
-                      {opens ? ((clicks / opens) * 100).toFixed(1) : "0"}% CTR ·
-                      Expires{" "}
-                      {new Date(l.expiresAt).toLocaleDateString("en-GB")}
+                      {opens ? ((clicks / opens) * 100).toFixed(1) : "0"}% CTR
                     </p>
                     <div className="card-actions">
-                      {!!days &&
-                        p &&
-                        p.inventory !== "skyscraper" &&
-                        l.presenceTier !== "LANDMARK" && (
-                          <button
-                            className="button coral"
-                            onClick={() => setUpgrade(l)}
-                          >
-                            <ArrowUpRight size={14} />
-                            Upgrade presence
-                          </button>
-                        )}
+                      {p && tier !== "SKYSCRAPER" && tier !== "LANDMARK" && (
+                        <button
+                          className="button coral"
+                          onClick={() => setUpgrade(l)}
+                        >
+                          <TrendingUp size={14} />
+                          Mejorar edificio
+                        </button>
+                      )}
                       <button
                         className="button outline"
                         onClick={() => {
@@ -165,38 +186,34 @@ export function Dashboard({ initial }: { initial: CityData }) {
                         }}
                       >
                         <Pencil size={12} />
-                        Edit ad
+                        Editar anuncio
                       </button>
-                      <button
+                      <Link
                         className="button outline"
-                        disabled={!p}
-                        onClick={() => {
-                          if (days) setRenew(l);
-                          else location.assign(`/?building=${l.propertyId}`);
-                        }}
+                        href={`/?building=${l.propertyId}`}
                       >
-                        <RefreshCw size={12} />
-                        {days ? "Renew" : "Reclaim"}
-                      </button>
+                        <ArrowUpRight size={12} />
+                        Ver en la ciudad
+                      </Link>
                       <button
                         className="button dark"
                         disabled={!p}
                         onClick={() => p && setShare(p)}
                       >
                         <Share2 size={12} />
-                        Share
+                        Compartir
                       </button>
                     </div>
                     {!!l.upgradeHistory?.length && (
                       <details className="upgrade-history">
                         <summary>
-                          Upgrade history ({l.upgradeHistory.length})
+                          Historial de mejoras ({l.upgradeHistory.length})
                         </summary>
                         {l.upgradeHistory.map((h) => (
                           <p key={h.reservationId}>
                             {h.from} → {h.to} · {euro(h.amount)}
                             <small>
-                              {new Date(h.createdAt).toLocaleString("en-GB")}
+                              {new Date(h.createdAt).toLocaleString("es-ES")}
                             </small>
                           </p>
                         ))}
@@ -210,17 +227,17 @@ export function Dashboard({ initial }: { initial: CityData }) {
         ) : (
           <div className="empty-state">
             <Building2 size={35} />
-            <h2>Your first address is waiting.</h2>
-            <p>Find a building, add your brand, and move right in.</p>
+            <h2>Tu primer solar te está esperando.</h2>
+            <p>Elige un solar, añade tu marca y construye tu edificio.</p>
             <Link href="/?available=1" className="button coral">
-              Find my spot <ArrowUpRight size={16} />
+              Elegir mi solar <ArrowUpRight size={16} />
             </Link>
           </div>
         )}
       </main>
       {edit && ad && (
-        <Modal title="FRESHEN UP YOUR SPACE" onClose={() => setEdit(null)}>
-          <h2>Edit your advertisement.</h2>
+        <Modal title="DALE UN AIRE NUEVO" onClose={() => setEdit(null)}>
+          <h2>Edita tu anuncio.</h2>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -245,7 +262,7 @@ export function Dashboard({ initial }: { initial: CityData }) {
                 <Loader2 className="spin" size={16} />
               ) : (
                 <>
-                  Save advertisement
+                  Guardar anuncio
                   <Pencil size={14} />
                 </>
               )}
@@ -253,33 +270,17 @@ export function Dashboard({ initial }: { initial: CityData }) {
           </form>
         </Modal>
       )}
-      {renew && data.properties.find((p) => p.id === renew.propertyId) && (
-        <ClaimModal
-          property={data.properties.find((p) => p.id === renew.propertyId)!}
-          durations={data.durations}
-          demo={data.demo}
-          renewalLeaseId={renew.id}
-          initialAd={renew.ad}
-          email={renew.email}
-          onClose={() => setRenew(null)}
-          onComplete={async () => {
-            setRenew(null);
-            await load();
-            await refresh();
-          }}
-        />
-      )}
       {share && <ShareModal property={share} onClose={() => setShare(null)} />}
       {upgrade && data.properties.find((p) => p.id === upgrade.propertyId) && (
         <ClaimModal
           property={data.properties.find((p) => p.id === upgrade.propertyId)!}
-          durations={data.durations}
           demo={data.demo}
           upgradeLeaseId={upgrade.id}
           initialAd={upgrade.ad}
           email={upgrade.email}
           onClose={() => setUpgrade(null)}
           onComplete={async () => {
+            setGrown(upgrade.propertyId);
             setUpgrade(null);
             await load();
             await refresh();

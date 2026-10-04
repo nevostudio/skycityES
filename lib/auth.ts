@@ -34,8 +34,11 @@ export async function identity() {
 export async function requireIdentity(admin = false) {
   const user = await identity();
   if (!user)
-    throw new DomainError("Request a secure access link to continue.", 401);
+    throw new DomainError(
+      "Pide un enlace de acceso seguro para continuar.",
+      401,
+    );
   if (admin && !user.admin)
-    throw new DomainError("Administrator access required.", 403);
+    throw new DomainError("Se necesita acceso de administrador.", 403);
   return user;
 }

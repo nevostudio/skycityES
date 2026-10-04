@@ -1,10 +1,12 @@
+import type { Ad, Lease, State } from "@/types";
+import { DomainError, buildingFor, sweep } from "./engine";
+import { makeBuilding } from "./plots";
 import { randomUUID } from "node:crypto";
-import type { Ad, State } from "@/types";
-import { DomainError, sweep } from "./engine";
 
+/** Manual skyscraper placement for a major brand: builds the tower, records no payment. */
 export function assignSkyscraper(
   s: State,
-  input: { propertyId: string; email: string; ad: Ad; days: number },
+  input: { propertyId: string; email: string; ad: Ad },
   adminEmail: string,
   demo: boolean,
   now = Date.now(),
@@ -14,8 +16,9 @@ export function assignSkyscraper(
     (p) =>
       p.id === input.propertyId && p.enabled && p.inventory === "skyscraper",
   );
-  if (!p) throw new DomainError("Choose an active skyscraper.", 404);
+  if (!p) throw new DomainError("Elige un rascacielos activo.", 404);
   if (
+    buildingFor(s, p.id) ||
     s.leases.some((l) => l.propertyId === p.id && l.status === "active") ||
     s.reservations.some(
       (r) => r.propertyId === p.id && r.status === "reserved",
@@ -27,18 +30,18 @@ export function assignSkyscraper(
     )
   )
     throw new DomainError(
-      "This skyscraper is occupied or has a checkout or auction in progress.",
+      "Este rascacielos ya está ocupado o tiene un pago o una subasta en curso.",
       409,
     );
   p.reservedForBrands = false;
   p.sale = "rental";
-  const lease = {
+  const at = new Date(now).toISOString();
+  const lease: Lease = {
     id: `assigned-${randomUUID()}`,
     propertyId: p.id,
     email: input.email,
     ad: { ...input.ad, status: "active" as const },
-    startsAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + input.days * 86400000).toISOString(),
+    startsAt: at,
     status: "active" as const,
     demo,
     autoRenew: false,
@@ -48,5 +51,12 @@ export function assignSkyscraper(
     assignedBy: adminEmail,
   };
   s.leases.push(lease);
+  s.buildings.push(
+    makeBuilding(p, "SKYSCRAPER", at, {
+      id: `bld-${lease.id}`,
+      leaseId: lease.id,
+      demo,
+    }),
+  );
   return lease;
 }

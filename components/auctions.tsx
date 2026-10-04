@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Clock, ArrowUpRight, Gavel, Loader2 } from "lucide-react";
 import type { CityData, PublicProperty } from "@/types";
 import { Header } from "./header";
-import { BuildingArt } from "./property/building-art";
+import { PropertyArt } from "./property/building-art";
 import { Modal } from "./modal";
 import { Login } from "./dashboard/login";
 import { useCity } from "@/hooks/use-city";
@@ -17,13 +17,13 @@ function Countdown({ ends }: { ends: string }) {
     return () => clearInterval(t);
   }, []);
   if (!now)
-    return <span>Closes {new Date(ends).toISOString().slice(0, 10)}</span>;
+    return <span>Cierra el {new Date(ends).toISOString().slice(0, 10)}</span>;
   const s = Math.max(0, Math.floor((Date.parse(ends) - now) / 1000));
   return (
     <span>
       {s
-        ? `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h ${Math.floor((s % 3600) / 60)}m ${s % 60}s remaining`
-        : "Auction ended"}
+        ? `Quedan ${Math.floor(s / 86400)} d ${Math.floor((s % 86400) / 3600)} h ${Math.floor((s % 3600) / 60)} min ${s % 60} s`
+        : "Subasta terminada"}
     </span>
   );
 }
@@ -46,20 +46,20 @@ export function Auctions({ initial }: { initial: CityData }) {
       <main className="page-shell">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">SOME ADDRESSES ARE ONE OF A KIND</span>
-            <h1>A little more iconic.</h1>
-            <p>Landmark buildings. Unmissable placements. One winning brand.</p>
+            <span className="eyebrow">ALGUNAS DIRECCIONES SON ÚNICAS</span>
+            <h1>Parcelas para rascacielos.</h1>
+            <p>Inventario premium. Una marca ganadora levanta su torre.</p>
           </div>
           <Link href="/" className="button outline">
-            Back to the city <ArrowUpRight size={15} />
+            Volver a la ciudad <ArrowUpRight size={15} />
           </Link>
         </div>
         <div className="inline-notice">
           {data.demo
-            ? "Demo auctions · no real money is collected."
-            : "Winning bids secure the right to a temporary advertising placement."}{" "}
-          Bids are binding in live mode. The winner has 24 hours to complete
-          payment.
+            ? "Subastas de demostración · no se cobra dinero real."
+            : "La puja ganadora construye un rascacielos en la parcela, con pago único."}{" "}
+          Las pujas son vinculantes en modo real. El ganador tiene 24 horas para
+          completar el pago.
         </div>
         {success && (
           <div className="notice" role="status">
@@ -71,10 +71,11 @@ export function Auctions({ initial }: { initial: CityData }) {
             .filter((p) => p.auction)
             .map((p) => (
               <article className="auction-card" key={p.id}>
-                <BuildingArt property={p} />
+                <PropertyArt property={p} />
                 <div className="auction-details">
                   <span className="eyebrow">
-                    {p.districtId.replaceAll("-", " ")} / ICONIC
+                    {data.districts.find((d) => d.id === p.districtId)?.name} /
+                    RASCACIELOS
                   </span>
                   <h2>
                     <Link href={`/auctions/${p.id}`}>{p.name}</Link>
@@ -86,22 +87,19 @@ export function Auctions({ initial }: { initial: CityData }) {
                   <div className="auction-numbers">
                     <div>
                       <small>
-                        {p.auction!.currentBid ? "Current bid" : "Opening bid"}
+                        {p.auction!.currentBid ? "Puja actual" : "Puja inicial"}
                       </small>
                       <strong>
                         {euro(p.auction!.currentBid || p.auction!.nextBid)}
                       </strong>
                     </div>
                     <div>
-                      <small>Unique bidders</small>
+                      <small>Postores</small>
                       <strong>{p.auction!.bidders}</strong>
                     </div>
                     <div>
-                      <small>Lease duration</small>
-                      <strong>
-                        {p.auction!.days}
-                        <small>days</small>
-                      </strong>
+                      <small>Edificio</small>
+                      <strong>Rascacielos</strong>
                     </div>
                   </div>
                   <button
@@ -113,11 +111,11 @@ export function Auctions({ initial }: { initial: CityData }) {
                     }}
                   >
                     <Gavel size={15} />
-                    Place a bid <ArrowUpRight size={16} />
+                    Pujar <ArrowUpRight size={16} />
                   </button>
                   <details className="bid-history">
                     <summary>
-                      Bid history · {p.auction!.history.length} recent bids
+                      Historial · {p.auction!.history.length} pujas recientes
                     </summary>
                     {p.auction!.history.map((b, i) => (
                       <div key={i}>
@@ -126,7 +124,7 @@ export function Auctions({ initial }: { initial: CityData }) {
                       </div>
                     ))}
                     {!p.auction!.history.length && (
-                      <p>Be the first to make your mark.</p>
+                      <p>Sé el primero en dejar tu huella.</p>
                     )}
                   </details>
                 </div>
@@ -136,14 +134,14 @@ export function Auctions({ initial }: { initial: CityData }) {
         {!data.stats.auctions && (
           <div className="empty-state">
             <Gavel size={35} />
-            <h2>All quiet on the auction block.</h2>
-            <p>New landmark placements will appear here.</p>
+            <h2>No hay subastas abiertas.</h2>
+            <p>Las nuevas parcelas premium aparecerán aquí.</p>
           </div>
         )}
       </main>
       {selected && (
         <Modal
-          title="AN ADDRESS WORTH TALKING ABOUT"
+          title="UNA DIRECCIÓN DE LA QUE SE HABLA"
           onClose={() => setSelected(null)}
         >
           {!user ? (
@@ -161,7 +159,7 @@ export function Auctions({ initial }: { initial: CityData }) {
                   });
                   await refresh();
                   setSuccess(
-                    `Your bid of ${euro(amount)} on ${selected.name} is in.`,
+                    `Tu puja de ${euro(amount)} por ${selected.name} está registrada.`,
                   );
                   setSelected(null);
                 } catch (e) {
@@ -173,11 +171,11 @@ export function Auctions({ initial }: { initial: CityData }) {
             >
               <h2>{selected.name}</h2>
               <p className="muted">
-                The next bid is {euro(selected.auction!.nextBid)} or more. The
-                winning placement lasts {selected.auction!.days} days.
+                La siguiente puja es de {euro(selected.auction!.nextBid)} o más.
+                La marca ganadora construye aquí su rascacielos.
               </p>
               <label>
-                Your bid (€)
+                Tu puja (€)
                 <input
                   type="number"
                   required
@@ -187,7 +185,7 @@ export function Auctions({ initial }: { initial: CityData }) {
                   onChange={(e) => setAmount(Number(e.target.value))}
                 />
               </label>
-              <p className="microcopy">Bidding as {user.email}</p>
+              <p className="microcopy">Pujas como {user.email}</p>
               {error && (
                 <p className="error" role="alert">
                   {error}
@@ -198,7 +196,7 @@ export function Auctions({ initial }: { initial: CityData }) {
                   <Loader2 className="spin" size={17} />
                 ) : (
                   <>
-                    Place bid · {euro(amount)}
+                    Pujar · {euro(amount)}
                     <Gavel size={16} />
                   </>
                 )}

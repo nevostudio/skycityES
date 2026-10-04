@@ -8,7 +8,7 @@ import { flushMail } from "@/lib/email";
 export async function POST(req: Request) {
   if (isDemo())
     return Response.json(
-      { error: "Stripe is disabled in demo mode." },
+      { error: "Stripe está desactivado en modo demo." },
       { status: 404 },
     );
   let event;
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!,
     );
   } catch {
-    return Response.json({ error: "Invalid signature" }, { status: 400 });
+    return Response.json({ error: "Firma no válida" }, { status: 400 });
   }
   try {
     if (
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       const session = event.data.object;
       if (session.payment_status === "paid") {
         if (session.currency !== "eur")
-          throw new DomainError("Unexpected currency", 409);
+          throw new DomainError("Moneda inesperada", 409);
         await transaction((s) => {
           const r = s.reservations.find(
             (r) => r.id === session.metadata?.reservation_id,
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
             r.propertyId !== session.metadata?.property_id ||
             (r.sessionId && r.sessionId !== session.id)
           )
-            throw new DomainError("Invalid payment metadata", 409);
+            throw new DomainError("Metadatos de pago no válidos", 409);
           fulfill(
             s,
             r.id,

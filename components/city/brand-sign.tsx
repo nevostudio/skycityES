@@ -5,6 +5,7 @@ import { useSceneMotion } from "./scene-motion";
 import * as THREE from "three";
 import type { Ad, PublicProperty } from "@/types";
 import { presenceLevel } from "@/lib/presence";
+import { isShowcaseAd } from "@/lib/plots";
 
 export function brandKind(ad: Ad) {
   const kinds: Record<string, string> = {
@@ -15,12 +16,10 @@ export function brandKind(ad: Ad) {
     "Orbit Studio": "studio",
     Hyperbyte: "digital",
   };
-  return ad.description.includes("fictional demo")
-    ? kinds[ad.brand] || "custom"
-    : "custom";
+  return isShowcaseAd(ad) ? kinds[ad.brand] || "custom" : "custom";
 }
 export function brandTheme(ad: Ad) {
-  const demo = ad.description.includes("fictional demo");
+  const demo = isShowcaseAd(ad);
   const palette: Record<
     string,
     { accent: string; background: string; ink: string }
@@ -317,14 +316,13 @@ export function BrandSign({ p }: { p: PublicProperty & { ad: Ad } }) {
   const cafe = kind === "cafe",
     garden = kind === "garden",
     club = kind === "nightlife";
-  const level =
-    p.inventory === "skyscraper" ? 5 : presenceLevel(p.presenceTier);
+  const level = presenceLevel(p.building?.tier);
   const rooftop = level >= 3;
   const signWidth = w * (level === 0 ? 0.82 : 1.03);
   const signY = rooftop
     ? h + (p.type === "house" ? 1.9 : 1.05)
     : cafe || garden
-      ? Math.max(h - 0.55, 2.35)
+      ? Math.max(h - 0.55, Math.min(2.35, h - 0.45))
       : Math.max(h * 0.74, h - 1.05);
   const signH = rooftop ? 1.75 : level === 0 ? 0.9 : Math.min(1.6, h * 0.48);
   const sideSize = Math.min(d * 0.86, h * 0.7);

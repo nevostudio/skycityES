@@ -18,7 +18,7 @@ export function PresencePreview({
     <svg
       viewBox="0 0 120 125"
       role="img"
-      aria-label={`${tier.toLowerCase()} building preview`}
+      aria-label={`Vista previa del edificio ${tier}`}
     >
       <path d="M12 103 56 84 109 104 65 122Z" fill="#dfe6d8" />
       <path d={`M33 ${top + 12} 64 ${top + 23}V112L33 100Z`} fill="#e9dfce" />
@@ -94,12 +94,16 @@ export function PresenceSelector({
 }) {
   return (
     <fieldset className="presence-fieldset">
-      <legend>Choose your presence in SkyCity</legend>
-      <p className="field-hint">
-        Same address. More presence.{" "}
+      <legend>
         {current
-          ? "Pay only the difference; your expiry date stays the same."
-          : "Every tier includes your brand. Start small and upgrade whenever you like."}
+          ? "Elige el nuevo tamaño"
+          : "1. Elige el tamaño de tu edificio"}
+      </legend>
+      <p className="field-hint">
+        Mismo solar. Más presencia.{" "}
+        {current
+          ? "Pagas solo la diferencia y tu edificio crece en el mismo sitio."
+          : "Todos incluyen tu marca. Empieza pequeño y mejóralo cuando quieras."}
       </p>
       <div className="presence-options">
         {PRESENCE_TIERS.map((tier) => {
@@ -127,10 +131,10 @@ export function PresenceSelector({
               <b>{euro(PRESENCE[tier].price)}</b>
               <small>
                 {current === tier
-                  ? "Current tier"
+                  ? "Tamaño actual"
                   : current && !disabled
                     ? `+${euro(PRESENCE[tier].price - PRESENCE[current].price)}`
-                    : "30 days"}
+                    : PRESENCE[tier].floors}
               </small>
             </label>
           );

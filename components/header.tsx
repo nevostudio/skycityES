@@ -14,15 +14,15 @@ export function Header({
   return (
     <header className="header">
       <Brand />
-      <nav aria-label="Main navigation">
+      <nav aria-label="Navegación principal">
         <Link className={pathname === "/" ? "active" : ""} href="/">
-          Explore
+          Explorar
         </Link>
         <Link
           className={pathname === "/auctions" ? "active" : ""}
           href="/auctions"
         >
-          Auctions
+          Subastas
           <span className="nav-dot" />
         </Link>
         <Link
@@ -30,18 +30,18 @@ export function Header({
           href="/my-buildings"
         >
           <Building2 size={15} />
-          My buildings
+          Mis edificios
         </Link>
       </nav>
       <div className="header-right">
-        {demo && <span className="demo-label">DEMO CITY</span>}
+        {demo && <span className="demo-label">CIUDAD DEMO</span>}
         {onClaim ? (
           <button className="button dark small" onClick={onClaim}>
-            Claim a spot <ArrowUpRight size={16} />
+            Construir <ArrowUpRight size={16} />
           </button>
         ) : (
           <Link href="/?available=1" className="button dark small">
-            Claim a spot <ArrowUpRight size={16} />
+            Construir <ArrowUpRight size={16} />
           </Link>
         )}
       </div>

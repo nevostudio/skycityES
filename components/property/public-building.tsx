@@ -1,15 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Share2, MapPin, Eye } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Share2,
+  MapPin,
+  Eye,
+  Hammer,
+} from "lucide-react";
 import type { CityData } from "@/types";
 import { Header } from "../header";
-import { BuildingArt } from "./building-art";
+import { PropertyArt } from "./building-art";
 import { ClaimModal } from "../checkout/claim-modal";
 import { ShareModal } from "./share-modal";
 import { useCity } from "@/hooks/use-city";
 import { track } from "@/lib/analytics/client";
-import { euro } from "@/lib/client";
+import { euro, siteNote, statusLabel } from "@/lib/client";
 export function PublicBuilding({
   initial,
   propertyId,
@@ -22,6 +29,7 @@ export function PublicBuilding({
   const [share, setShare] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const p = data.properties.find((p) => p.id === propertyId)!;
+  const site = p.inventory === "skyscraper" && !p.building;
   useEffect(() => {
     track("property_open", propertyId);
     track("property_impression", propertyId);
@@ -32,11 +40,11 @@ export function PublicBuilding({
       <main className="page-shell">
         <Link className="back-link" href={`/?building=${p.id}`}>
           <ArrowLeft size={14} />
-          Find it in the city
+          Verlo en la ciudad
         </Link>
         <article className="property-page">
           <div className="property-page-art">
-            <BuildingArt property={p} brand={p.ad?.brand} />
+            <PropertyArt property={p} brand={p.ad?.brand} />
           </div>
           <div>
             <span className="eyebrow">
@@ -49,53 +57,50 @@ export function PublicBuilding({
               <img
                 className="public-ad-logo"
                 src={p.ad.logo}
-                alt={`${p.ad.brand} logo`}
+                alt={`Logo de ${p.ad.brand}`}
               />
             )}
             <p>
               {p.ad?.description ||
-                "A home for your brand in a city built for discovery. One building, one advertiser, and a whole neighborhood of possibilities."}
+                (p.building?.kind === "public"
+                  ? p.description
+                  : p.building
+                    ? "Un edificio con propietario en SkyCity."
+                    : site
+                      ? "Parcela reservada para un rascacielos. Inventario premium para grandes marcas."
+                      : "Un solar vacío esperando una idea. Construye aquí tu propio edificio: pago único, sin registro.")}
             </p>
             {p.ad?.banner && (
               <img
                 className="ad-banner"
                 src={p.ad.banner}
-                alt={`${p.ad.brand} banner`}
+                alt={`Banner de ${p.ad.brand}`}
               />
             )}
             <div className="property-facts">
               <span>
                 <Eye size={15} />
-                {p.views} profile views
+                {p.views} visitas
               </span>
               <span>
-                {p.inventory === "skyscraper"
-                  ? "EXCLUSIVE SKYSCRAPER"
-                  : p.status === "claimed"
-                    ? p.presenceTier
-                    : "PRESENCE FROM €3"}
+                {p.building
+                  ? p.building.kind === "public"
+                    ? "EDIFICIO PÚBLICO"
+                    : `EDIFICIO ${p.building.tier}`
+                  : site
+                    ? "PARCELA PREMIUM"
+                    : `SOLAR · DESDE ${euro(p.price)}`}
               </span>
-              <span>{p.status.toUpperCase()}</span>
+              <span>{statusLabel[p.status].toUpperCase()}</span>
             </div>
             {p.status === "available" && (
               <div className="price-row">
                 <div>
-                  <strong>
-                    {euro(p.prices["30"] || Object.values(p.prices)[0])}
-                  </strong>
-                  <span>
-                    {" "}
-                    / {p.prices["30"] ? "30" : Object.keys(p.prices)[0]} days
-                  </span>
+                  <small>{site ? "Precio" : "Desde"}</small>
+                  <strong>{euro(p.price)}</strong>
                 </div>
-                <span>One-time payment</span>
+                <span>Pago único</span>
               </div>
-            )}
-            {p.expiresAt && (
-              <p className="microcopy">
-                Advertising placement active until{" "}
-                {new Date(p.expiresAt).toLocaleDateString("en-GB")}
-              </p>
             )}
             <div className="public-actions">
               {p.status === "available" ? (
@@ -106,8 +111,8 @@ export function PublicBuilding({
                     setClaim(true);
                   }}
                 >
-                  Claim this building
-                  <ArrowUpRight size={16} />
+                  {site ? "Construir rascacielos" : "Construir aquí"}
+                  <Hammer size={16} />
                 </button>
               ) : p.ad?.website ? (
                 <a
@@ -125,21 +130,24 @@ export function PublicBuilding({
                   className="button coral"
                   href={`/auctions?property=${p.id}`}
                 >
-                  View auction
+                  Ver subasta
                   <ArrowUpRight size={16} />
                 </Link>
               ) : (
-                <span className="button outline">
+                <button className="button outline" disabled>
                   {p.status === "reserved"
-                    ? p.reservedForBrands
-                      ? "Reserved for major brands"
-                      : "Temporarily reserved"
-                    : "Placement claimed"}
-                </span>
+                    ? site
+                      ? siteNote(p).charAt(0) +
+                        siteNote(p).slice(1).toLowerCase()
+                      : "Reservado temporalmente"
+                    : p.status === "public"
+                      ? "Edificio de la ciudad"
+                      : "Edificio construido"}
+                </button>
               )}
               <button className="button outline" onClick={() => setShare(true)}>
                 <Share2 size={15} />
-                Share
+                Compartir
               </button>
             </div>
             <div className="social-links">
@@ -160,7 +168,7 @@ export function PublicBuilding({
             </div>
             {p.ad?.promo && (
               <p className="promo-code">
-                Use code: <strong>{p.ad.promo}</strong>
+                Usa el código: <strong>{p.ad.promo}</strong>
               </p>
             )}
           </div>
@@ -169,7 +177,6 @@ export function PublicBuilding({
       {claim && (
         <ClaimModal
           property={p}
-          durations={data.durations}
           demo={data.demo}
           onClose={() => setClaim(false)}
           onComplete={async () => {

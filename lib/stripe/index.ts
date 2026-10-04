@@ -19,8 +19,8 @@ export async function createSession(r: Reservation, access: string) {
             unit_amount: Math.round(r.amount * 100),
             product_data: {
               name: r.upgradeLeaseId
-                ? `SkyCity · ${r.propertyId} · upgrade ${r.fromTier} to ${r.presenceTier}`
-                : `SkyCity · ${r.propertyId} · ${r.presenceTier || "STARTER"} · ${r.days} days`,
+                ? `SkyCity · ${r.propertyId} · mejora ${r.fromTier} → ${r.presenceTier}`
+                : `SkyCity · ${r.propertyId} · edificio ${r.presenceTier || "STARTER"} · pago único`,
             },
           },
         },
@@ -28,16 +28,12 @@ export async function createSession(r: Reservation, access: string) {
       metadata: {
         property_id: r.propertyId,
         reservation_id: r.id,
-        lease_duration: String(r.days),
         presence_tier: r.presenceTier || "STARTER",
-        purpose: r.upgradeLeaseId
-          ? "upgrade"
-          : r.renewalLeaseId
-            ? "renewal"
-            : "claim",
+        purpose: r.upgradeLeaseId ? "upgrade" : "claim",
       },
       success_url: `${appUrl()}/success?reservation=${r.id}&access=${access}`,
       cancel_url: `${appUrl()}/?building=${r.propertyId}&cancelled=1`,
+      locale: "es",
     },
     { idempotencyKey: `checkout-${r.id}` },
   );

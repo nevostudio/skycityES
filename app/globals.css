@@ -765,6 +765,9 @@ h3 {
 .reserved {
   background: #a6a49a;
 }
+.public {
+  background: #8fa7b8;
+}
 .map-help {
   display: flex;
   align-items: center;
@@ -2840,4 +2843,14 @@ td small {
   .claim-modal .duration-options small {
     font-size: 8px;
   }
+}
+
+/* Fase 1 · solares y construcción */
+.claim-modal .form-step {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+.plot-art {
+  background: transparent;
 }

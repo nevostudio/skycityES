@@ -15,10 +15,11 @@ export async function GET() {
       {
         user,
         leases: s.leases
-          .filter((l) => l.email === user.email)
+          .filter((l) => l.email === user.email && !l.retired)
           .map((l) => ({
             ...l,
             property: s.properties.find((p) => p.id === l.propertyId),
+            building: s.buildings.find((b) => b.leaseId === l.id) || null,
             analytics: s.analytics
               .filter((e) => e.propertyId === l.propertyId)
               .reduce(
@@ -44,7 +45,7 @@ export async function PATCH(req: Request) {
       const l = s.leases.find(
         (l) => l.id === input.leaseId && l.email === user.email,
       );
-      if (!l) throw new DomainError("Lease not found.", 404);
+      if (!l) throw new DomainError("Edificio no encontrado.", 404);
       l.ad = {
         ...ad,
         status: ["suspended", "rejected"].includes(l.ad.status)

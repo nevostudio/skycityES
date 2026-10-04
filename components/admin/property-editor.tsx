@@ -13,17 +13,17 @@ export function PropertyEditor({
 }: {
   edit: Property;
   setEdit: Dispatch<SetStateAction<Property | null>>;
-  data: { districts: District[]; settings: { durations: number[] } };
+  data: { districts: District[] };
   action: (body: unknown) => Promise<boolean>;
   error: string;
   busy: boolean;
 }) {
   return (
     <Modal
-      title={edit.id ? "EDIT THE NEIGHBORHOOD" : "MAKE ROOM FOR A NEW IDEA"}
+      title={edit.id ? "EDITAR EL BARRIO" : "HAZ SITIO A UNA NUEVA IDEA"}
       onClose={() => setEdit(null)}
     >
-      <h2>{edit.id ? edit.name : "New building"}</h2>
+      <h2>{edit.id ? edit.name : "Nuevo solar"}</h2>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -32,7 +32,7 @@ export function PropertyEditor({
         }}
       >
         <label>
-          Building name
+          Nombre
           <input
             required
             value={edit.name}
@@ -41,7 +41,7 @@ export function PropertyEditor({
         </label>
         <div className="form-row">
           <label>
-            District
+            Barrio
             <select
               value={edit.districtId}
               onChange={(e) => setEdit({ ...edit, districtId: e.target.value })}
@@ -54,7 +54,7 @@ export function PropertyEditor({
             </select>
           </label>
           <label>
-            Type
+            Estilo de zona
             <select
               value={edit.type}
               onChange={(e) =>
@@ -85,7 +85,7 @@ export function PropertyEditor({
         </div>
         <div className="form-row">
           <label>
-            Location category
+            Categoría de ubicación
             <select
               value={edit.tier}
               onChange={(e) =>
@@ -101,7 +101,7 @@ export function PropertyEditor({
             </select>
           </label>
           <label>
-            Placement
+            Venta
             <select
               value={edit.sale}
               onChange={(e) =>
@@ -111,50 +111,66 @@ export function PropertyEditor({
                 })
               }
             >
-              <option value="rental">Rental</option>
-              <option value="auction">Auction</option>
+              <option value="rental">Venta directa</option>
+              <option value="auction">Subasta</option>
             </select>
           </label>
         </div>
         <div className="form-row">
           <label>
-            Inventory
+            Inventario
             <select
               value={edit.inventory || "normal"}
               onChange={(e) =>
                 setEdit({
                   ...edit,
                   inventory: e.target.value as Property["inventory"],
-                  prices: { "30": e.target.value === "skyscraper" ? 200 : 3 },
+                  price: e.target.value === "skyscraper" ? 200 : 3,
                 })
               }
             >
-              <option value="normal">Normal · presence tiers from €3</option>
+              <option value="normal">Solar normal · edificios desde 3 €</option>
               <option value="skyscraper">
-                Exclusive skyscraper · limited inventory
+                Rascacielos · inventario premium
               </option>
+              {edit.inventory === "public" && (
+                <option value="public">Edificio público</option>
+              )}
             </select>
           </label>
           {edit.inventory === "skyscraper" && (
             <label>
-              Availability
+              Disponibilidad
               <select
-                value={edit.reservedForBrands ? "reserved" : "available"}
+                value={
+                  edit.reservedForBrands
+                    ? edit.premiumNote === "auction_soon"
+                      ? "soon"
+                      : "reserved"
+                    : "available"
+                }
                 onChange={(e) =>
                   setEdit({
                     ...edit,
-                    reservedForBrands: e.target.value === "reserved",
+                    reservedForBrands: e.target.value !== "available",
+                    premiumNote:
+                      e.target.value === "soon"
+                        ? "auction_soon"
+                        : e.target.value === "reserved"
+                          ? "major_brands"
+                          : undefined,
                   })
                 }
               >
-                <option value="available">Available</option>
-                <option value="reserved">Reserved for major brands</option>
+                <option value="available">Disponible</option>
+                <option value="reserved">Reservado para grandes marcas</option>
+                <option value="soon">Subasta próximamente</option>
               </select>
             </label>
           )}
         </div>
         <div className="form-row">
-          {(["x", "z", "height"] as const).map((k) => (
+          {(["x", "z"] as const).map((k) => (
             <label key={k}>
               {k}
               <input
@@ -184,61 +200,48 @@ export function PropertyEditor({
           ))}
         </div>
         <label>
-          Building color
+          Color
           <input
             type="color"
             value={edit.color}
             onChange={(e) => setEdit({ ...edit, color: e.target.value })}
           />
         </label>
-        <div className="form-row">
-          {(edit.inventory === "skyscraper"
-            ? data.settings.durations
-            : [30]
-          ).map((d) => (
-            <label key={d}>
-              € / {d} days
-              <input
-                type="number"
-                required
-                disabled={edit.inventory !== "skyscraper"}
-                min="1"
-                step=".01"
-                value={edit.prices[String(d)] || ""}
-                onChange={(e) =>
-                  setEdit({
-                    ...edit,
-                    prices: {
-                      ...edit.prices,
-                      [String(d)]: Number(e.target.value),
-                    },
-                  })
-                }
-              />
-            </label>
-          ))}
-        </div>
-        {edit.inventory !== "skyscraper" && (
+        {edit.inventory === "skyscraper" ? (
+          <label>
+            Precio premium (€, pago único)
+            <input
+              type="number"
+              required
+              min="1"
+              step=".01"
+              value={edit.price || ""}
+              onChange={(e) =>
+                setEdit({ ...edit, price: Number(e.target.value) })
+              }
+            />
+          </label>
+        ) : (
           <p className="field-hint">
-            All normal locations: Starter €3 · Plus €7 · Pro €15 · Premium €30 ·
-            Landmark €60, for 30 days.
+            Solares normales, pago único: STARTER 3 € · PLUS 7 € · PRO 15 € ·
+            PREMIUM 30 € · LANDMARK 60 €.
           </p>
         )}
         <div className="form-row">
           <label>
-            Visibility
+            Visibilidad
             <select
               value={String(edit.enabled)}
               onChange={(e) =>
                 setEdit({ ...edit, enabled: e.target.value === "true" })
               }
             >
-              <option value="true">Active</option>
-              <option value="false">Deactivated</option>
+              <option value="true">Activo</option>
+              <option value="false">Desactivado</option>
             </select>
           </label>
           <label>
-            Featured location
+            Ubicación destacada
             <select
               value={String(edit.featured)}
               onChange={(e) =>
@@ -246,7 +249,7 @@ export function PropertyEditor({
               }
             >
               <option value="false">No</option>
-              <option value="true">Yes</option>
+              <option value="true">Sí</option>
             </select>
           </label>
         </div>
@@ -256,7 +259,7 @@ export function PropertyEditor({
           </p>
         )}
         <button className="button coral wide" disabled={busy}>
-          Save property
+          Guardar solar
         </button>
       </form>
       {edit.id && edit.inventory === "skyscraper" && (
@@ -270,7 +273,6 @@ export function PropertyEditor({
                 action: "assign-skyscraper",
                 propertyId: edit.id,
                 email: f.get("email"),
-                days: Number(f.get("days")),
                 ad: {
                   ...emptyAd,
                   brand: f.get("brand"),
@@ -282,45 +284,32 @@ export function PropertyEditor({
               setEdit(null);
           }}
         >
-          <h3>Assign to a major brand</h3>
+          <h3>Asignar a una gran marca</h3>
           <p className="field-hint">
-            Manual placement. No payment is recorded. Existing leases, checkouts
-            and live auctions are protected.
+            Construye el rascacielos sin registrar un pago. Los edificios, pagos
+            y subastas en curso están protegidos.
           </p>
           <label>
-            Brand name
+            Nombre de la marca
             <input name="brand" required minLength={2} maxLength={40} />
           </label>
           <label>
-            Advertiser email
+            Email del anunciante
             <input name="email" type="email" required />
           </label>
           <label>
-            Website
+            Web
             <input name="website" type="url" placeholder="https://…" />
           </label>
-          <div className="form-row">
-            <label>
-              Brand color
-              <input name="primary" type="color" defaultValue="#426d67" />
-            </label>
-            <label>
-              Assignment days
-              <input
-                name="days"
-                type="number"
-                min={1}
-                max={365}
-                defaultValue={30}
-                required
-              />
-            </label>
-          </div>
+          <label>
+            Color de marca
+            <input name="primary" type="color" defaultValue="#426d67" />
+          </label>
           <button className="button outline wide" disabled={busy}>
-            Assign skyscraper
+            Asignar rascacielos
           </button>
           <p className="field-hint">
-            To open bidding, use City Hall → Auctions.
+            Para abrir pujas, usa Ayuntamiento → Subastas.
           </p>
         </form>
       )}

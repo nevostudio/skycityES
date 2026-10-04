@@ -9,7 +9,7 @@ export async function GET(req: Request) {
       (r) => r.id === u.searchParams.get("reservation"),
     );
     if (!r || r.accessHash !== hash(u.searchParams.get("access") || ""))
-      throw new DomainError("Invalid checkout access.", 403);
+      throw new DomainError("Acceso al pago no válido.", 403);
     const lease = s.leases.find(
       (l) => l.id === (r.upgradeLeaseId || r.renewalLeaseId || `lease-${r.id}`),
     );
@@ -25,7 +25,6 @@ export async function GET(req: Request) {
           ? {
               propertyId: lease.propertyId,
               ad: lease.ad,
-              expiresAt: lease.expiresAt,
             }
           : null,
       },

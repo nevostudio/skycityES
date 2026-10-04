@@ -1,6 +1,17 @@
 # SkyCity
 
-Una ciudad virtual explorable donde cada edificio aloja un único anuncio durante un alquiler temporal. Sin registro previo, contraseñas para compradores, blockchain ni promesas de inversión.
+Una ciudad virtual explorable que empieza casi vacía y **se construye según entran usuarios**: cada edificio privado existe porque alguien compró su solar. Pago único, sin registro previo, contraseñas para compradores, blockchain ni promesas de inversión.
+
+## Solares y edificios (fase 1)
+
+- **Solar** (`properties`) = la ubicación. **Edificio** (`buildings`) = lo que se construye encima. Un solar disponible no tiene edificio.
+- Flujo: explorar → elegir solar → **CONSTRUIR AQUÍ** → tamaño → personalizar → email → pago → construcción animada (~1,6 s) → el edificio aparece → compartir.
+- Tamaños de pago único: **STARTER 3 €** (1–2 plantas), **PLUS 7 €** (2–3), **PRO 15 €** (3–5), **PREMIUM 30 €** (5–8) y **LANDMARK 60 €** (gran edificio, nunca de altura de rascacielos).
+- Mejora en el mismo solar pagando solo la diferencia (STARTER → PRO = 12 €); el edificio crece con la misma animación.
+- Estados: solar `available` · `reserved` · `claimed` · `auction` · `public`; edificio `EMPTY` · `CONSTRUCTING` · `BUILT`; tiers `STARTER` · `PLUS` · `PRO` · `PREMIUM` · `LANDMARK` · `SKYSCRAPER`.
+- Los **rascacielos** son inventario premium (200 €+): de momento se muestran como parcelas en obra con grúa, reservadas para grandes marcas, con subasta próximamente o en subasta.
+- Edificios iniciales: 6 públicos (SkyCity HQ, NevoStudio, Ayuntamiento, Estación Central, Museo y Biblioteca) y, solo en demo, 4 marcas ficticias (Nova Labs, Pixel Coffee, Green Market y Moonlight Club).
+- Migración versionada (`plotsVersion`, `lib/plots.ts`): los leases activos pasan a edificios construidos y permanentes; los solares libres quedan vacíos; los anuncios demo sobrantes se retiran (marcados, no borrados). Usuarios, transacciones, pujas, subastas y analítica no cambian. En Postgres, aplica `supabase/migrations/20261004190000_plots_buildings.sql` con `npm run db:migrate`.
 
 ## Ejecutar
 
@@ -22,7 +33,7 @@ npm start
 
 ## Lo que funciona
 
-- Ciudad WebGL con **210 propiedades**, siete barrios y 20 combinaciones geométricas reutilizables. Materiales suaves, sombras, árboles, zonas verdes, río, coches y carteles integrados. Ventanas y árboles mediante `InstancedMesh`.
+- Ciudad WebGL urbanizada con **210 solares**, siete barrios, calles, cruces, aceras, parques, río, puentes, farolas y mobiliario. Solo se renderizan los edificios que existen; los solares vacíos se dibujan en cuatro `InstancedMesh` compartidos (bordillo, tierra, estacas y «+»). Ventanas por planta y árboles también instanciados.
 - Ciudad a pantalla completa bajo una barra de 68 px, sin sidebar ni tarjetas debajo del mapa. Búsqueda flotante, barrios desplegables, directorio y controles superpuestos.
 - Cámara ortográfica a escala de barrio: arrastrar para desplazar, rueda/pellizco para zoom y botón derecho/dos dedos para rotar. Al seleccionar, la cámara se acerca y los edificios cercanos se atenúan para despejar la vista. Ficha flotante en escritorio y panel inferior en móvil.
 - Marcas integradas mediante un rótulo principal y una superficie secundaria con logo, sin repetir el nombre por todas las fachadas. Pixel Coffee usa madera, vidrio cálido y terraza; Moonlight Club, neón violeta y una pulsación lenta; Green Market, cubierta plantada, toldo a rayas y vegetación. Los anunciantes propios conservan sus colores, logo, banner y estilo de cartel.
@@ -31,18 +42,18 @@ npm start
 - Hero compacto, paletas y mobiliario diferenciados por barrio, paseo de madera junto al río, seis coches lentos y una pequeña embarcación con movimiento ambiental. La preferencia del sistema de movimiento reducido detiene las animaciones ambientales y hace inmediato el enfoque de cámara. El mobiliario urbano utiliza instancias compartidas.
 - Búsqueda por edificio, número, marca o barrio; filtros de disponibilidad, precio, subasta y categoría; directorio accesible mediante teclado.
 - **Explorar → seleccionar → personalizar → email → checkout → anuncio activo → compartir**.
-- Alquileres de 7, 30 y 90 días, precios y plazos editables en administración, reservas exclusivas y renovación manual.
+- Edificios de pago único en cinco tamaños, mejora pagando la diferencia y reservas exclusivas durante el pago. Sin alquileres ni renovaciones.
 - Nombre, logo, banner, descripción, web, redes, código promocional, CTA, colores y estilo del cartel. Carga de PNG/JPEG/WebP hasta 2 MB. Las imágenes externas requieren HTTPS; los logos remotos necesitan CORS para aparecer en una textura WebGL. Si no lo permiten, se conserva el nombre de la marca en el cartel.
-- My Buildings con enlaces de acceso de un solo uso, edición de anuncios, renovaciones, compartir y métricas agregadas.
+- Mis edificios con enlaces de acceso de un solo uso, edición de anuncios, mejora del edificio, compartir y métricas agregadas.
 - Subastas con pujas validadas en servidor, historial, contador basado en una fecha persistida, avisos y adjudicación.
-- City Hall: propiedades, ubicaciones, precios, tipos, categorías, destacados, barrios, alquileres, moderación, subastas, pujas, clientes, transacciones, correos y ajustes.
+- Ayuntamiento (`/admin`): solares, ubicaciones, precio premium de rascacielos, tipos, categorías, destacados, barrios, edificios y anuncios, moderación, subastas, pujas, clientes, transacciones, correos y ajustes.
 - URLs públicas renderizadas en servidor, metadata, canonical, sitemap, robots y tarjetas Open Graph PNG de 1200 × 630.
 
 ## Modo demo
 
 Se activa sin variables. También puede fijarse con `SKYCITY_MODE=demo`. Los datos viven en **`.data/skycity.sqlite`**, con WAL, transacciones y persistencia entre reinicios. Los archivos subidos viven en `.data/uploads`. `SKYCITY_DATA_DIR` permite una carpeta alternativa.
 
-La ciudad comienza con 16 anuncios ficticios (7,6 %), tres subastas y actividad claramente etiquetada como demo. Todos los contadores se calculan desde el almacenamiento; no hay ventas ni espectadores inventados fuera del seed demo. El checkout indica que no cobra dinero.
+La ciudad comienza con 10 edificios (6 públicos y 4 marcas ficticias), tres subastas de rascacielos y actividad claramente etiquetada como demo. Todos los contadores se calculan desde el almacenamiento; no hay ventas ni espectadores inventados fuera del seed demo. El checkout indica que no cobra dinero.
 
 En **My Buildings**, introduce cualquier email para abrir su buzón simulado. La respuesta incluye un enlace de un solo uso, válido 15 minutos. Después se usa una cookie HttpOnly con una sesión de siete días. El checkout demo abre la sesión del comprador automáticamente.
 
@@ -92,14 +103,14 @@ Los atributos configurables de cada entidad viven en JSONB; claves relacionales 
 2. SQLite usa `BEGIN IMMEDIATE`; PostgreSQL usa una transacción y `pg_advisory_xact_lock`.
 3. Solo una reserva pendiente puede existir por propiedad. PostgreSQL añade índices únicos para reserva, lease activo y checkout.
 4. Se guarda una reserva y un secreto de acceso de 256 bits. Solo su hash se almacena en la reserva.
-5. Stripe recibe `property_id`, `reservation_id` y `lease_duration`. El importe proviene de la reserva, nunca del navegador.
-6. El webhook verifica la firma sobre el cuerpo original, estado pagado, moneda, importe y metadata. La transacción crea/renueva el lease y registra pago, actividad y correo conjuntamente.
+5. Stripe recibe `property_id`, `reservation_id`, `presence_tier` y `purpose` (compra o mejora). El importe proviene de la reserva, nunca del navegador.
+6. El webhook verifica la firma sobre el cuerpo original, estado pagado, moneda, importe y metadata. La transacción crea el lease y el edificio (o hace crecer el existente en una mejora) y registra pago, actividad y correo conjuntamente.
 7. El ID de sesión y el ID de reserva son únicos: un evento duplicado no produce una segunda compra.
 8. `/success` solo consulta confirmación; nunca concede una propiedad por visitar una URL.
 
 Las reservas demo vencen en cinco minutos, configurables. Stripe impone un mínimo de 30 minutos; se usa un margen de 30 segundos al crear la sesión. Una reserva con Checkout Session **no se libera por el reloj local**: espera `checkout.session.expired` o confirmación de Stripe desde mantenimiento. Los pagos con webhook perdido pueden reconciliarse con la API autenticada de Stripe. Una respuesta ambigua al crear checkout conserva la reserva hasta el vencimiento en vez de permitir otra venta inmediata.
 
-Los leases vencidos desaparecen del snapshot público sin esperar al cron. Los índices persistentes se actualizan en mantenimiento o al iniciar otra reserva.
+Los edificios son permanentes (pago único); solo caducan las reservas de pago y las subastas. Los índices persistentes se actualizan en mantenimiento o al iniciar otra reserva.
 
 ## Activar Supabase / PostgreSQL
 
@@ -143,7 +154,7 @@ En producción crea un endpoint HTTPS para `/api/webhooks/stripe` y suscríbelo 
 - `checkout.session.async_payment_succeeded`
 - `checkout.session.expired`
 
-La implementación usa `allowed_payment_method_types` del SDK Stripe 23 fijado en el lockfile. Prueba una compra y una renovación con claves test, y repite el webhook para confirmar idempotencia antes de habilitar pagos reales.
+La implementación usa `allowed_payment_method_types` del SDK Stripe 23 fijado en el lockfile. Prueba una compra y una mejora con claves test, y repite el webhook para confirmar idempotencia antes de habilitar pagos reales.
 
 ## Subastas
 
@@ -155,7 +166,7 @@ Una subasta sin pujas se cierra. Las adjudicaciones impagadas requieren revisió
 
 ## Emails y mantenimiento
 
-`email_outbox` almacena mensajes de confirmación, renovación, vencimiento, recordatorio (7 días, 3 días y 24 horas), victoria y sobrepuja. Los avisos se deduplican por lease, fecha y umbral. En demo puedes inspeccionarlos desde City Hall; no se envían a destinatarios reales.
+`email_outbox` almacena mensajes de confirmación, mejora, victoria y sobrepuja. Los avisos se deduplican por identificador. En demo puedes inspeccionarlos desde City Hall; no se envían a destinatarios reales.
 
 Para envíos reales configura `RESEND_API_KEY` y `EMAIL_FROM` con un dominio verificado. Los correos de confirmación generan un enlace Magic Link con Supabase y conservan el cuerpo antes de enviar. Resend recibe una clave de idempotencia. El webhook intenta vaciar el outbox tras responder; el mantenimiento reintenta los pendientes. Los enlaces solicitados expresamente en My Buildings los entrega Supabase Auth a través de su SMTP.
 
@@ -176,7 +187,7 @@ Se agregan por día, propiedad y evento. Los eventos del navegador se deduplican
 npx playwright test
 ```
 
-Los seis recorridos cubren compra, compartir, edición, renovación, magic link, carrera por la misma propiedad, acceso privado, administración, moderación, pujas y móvil. La prueba de exploración a **1920 × 1080** comprueba el canvas completo, marcas, selección sin redimensionar el mapa, barrios, filtros y navegación sin errores de consola. Los tests de navegador operan sobre la **ciudad demo** y crean datos de prueba; usa una carpeta `SKYCITY_DATA_DIR` separada si quieres conservar otra demostración. `TEST_URL` permite apuntar a otra instancia. No ejecutes estos tests contra producción.
+Los recorridos cubren los casos A–D (construir, mejorar pagando la diferencia, recargar y solares sin comprador vacíos), compartir, edición, magic link, carrera por la misma propiedad, acceso privado, administración, moderación, pujas y móvil. La prueba de exploración a **1920 × 1080** comprueba el canvas completo, marcas, selección sin redimensionar el mapa, barrios, filtros y navegación sin errores de consola. Los tests de navegador operan sobre la **ciudad demo** y crean datos de prueba; usa una carpeta `SKYCITY_DATA_DIR` separada si quieres conservar otra demostración. `TEST_URL` permite apuntar a otra instancia. No ejecutes estos tests contra producción.
 
 Pruebas realizadas durante el desarrollo: TypeScript, build de producción, 11 tests de dominio/PostgreSQL y seis recorridos Playwright, además de inspección visual a 1920 × 1080 y 390 × 844. **No se ha realizado una transacción con servicios Supabase/Stripe/Resend reales**, porque no se han configurado credenciales en este workspace.
 

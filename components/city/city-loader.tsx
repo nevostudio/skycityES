@@ -6,8 +6,8 @@ const CityScene = dynamic(() => import("./city-scene"), {
   loading: () => (
     <div className="city-loading">
       <span className="loader" />
-      <p>A little city. Endless possibilities.</p>
-      <small>Opening SkyCity…</small>
+      <p>Una ciudad pequeña. Posibilidades infinitas.</p>
+      <small>Abriendo SkyCity…</small>
     </div>
   ),
 });
@@ -22,9 +22,9 @@ class SceneBoundary extends Component<
   render() {
     return this.state.failed ? (
       <div className="city-loading">
-        <p>Your browser couldn’t open the 3D city.</p>
+        <p>Tu navegador no ha podido abrir la ciudad en 3D.</p>
         <small>
-          Use the Building directory below to explore every property.
+          Usa el directorio de solares para explorar toda la ciudad.
         </small>
       </div>
     ) : (

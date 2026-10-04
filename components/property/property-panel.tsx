@@ -8,33 +8,62 @@ import {
   Clock,
   ExternalLink,
   Share2,
+  Hammer,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import type { PublicProperty, District } from "@/types";
-import { euro, propertyUrl } from "@/lib/client";
+import { euro, propertyUrl, siteNote, statusLabel } from "@/lib/client";
+import { PRESENCE } from "@/lib/presence";
 import { track } from "@/lib/analytics/client";
-import { BuildingArt } from "./building-art";
+import { PropertyArt } from "./building-art";
 export function PropertyPanel({
   property: p,
   district,
+  owned = false,
   onClose,
   onClaim,
+  onUpgrade,
   onShare,
 }: {
   property: PublicProperty;
   district?: District;
+  owned?: boolean;
   onClose: () => void;
   onClaim: () => void;
+  onUpgrade?: () => void;
   onShare: () => void;
 }) {
+  const site = p.inventory === "skyscraper" && !p.building;
+  const tier = p.building?.tier;
+  const canUpgrade =
+    owned &&
+    !!onUpgrade &&
+    p.building?.kind === "private" &&
+    tier !== "SKYSCRAPER" &&
+    tier !== "LANDMARK";
+  const upgrade = canUpgrade && (
+    <button className="button outline wide" onClick={onUpgrade}>
+      <TrendingUp size={16} />
+      Mejorar edificio
+    </button>
+  );
   return (
-    <aside className="property-panel" aria-label="Selected building">
+    <aside className="property-panel" aria-label="Solar seleccionado">
       <div className="panel-top">
-        <span className="eyebrow">YOUR NEXT ADDRESS</span>
+        <span className="eyebrow">
+          {p.building
+            ? p.building.kind === "public"
+              ? "EDIFICIO DE LA CIUDAD"
+              : `EDIFICIO ${tier}`
+            : site
+              ? "PARCELA PREMIUM"
+              : p.name.toUpperCase()}
+        </span>
         <button
           className="icon-button"
           onClick={onClose}
-          aria-label="Close property"
+          aria-label="Cerrar ficha"
         >
           <X size={18} />
         </button>
@@ -54,23 +83,25 @@ export function PropertyPanel({
           <div>
             <strong>{p.ad.brand}</strong>
             <span className="panel-claimed">
-              <ShieldCheck size={13} /> Claimed
+              <ShieldCheck size={13} /> Construido
             </span>
           </div>
         </div>
       ) : (
         <div className="property-art">
           <span className={`tier ${p.tier.toLowerCase()}`}>
-            {p.inventory === "skyscraper"
-              ? "EXCLUSIVE SKYSCRAPER"
-              : p.status === "claimed"
-                ? p.presenceTier
-                : "FROM €3"}
+            {site
+              ? `DESDE ${euro(p.price)}`
+              : p.building
+                ? p.building.kind === "public"
+                  ? "PÚBLICO"
+                  : tier
+                : `DESDE ${euro(p.price)}`}
           </span>
-          <BuildingArt property={p} />
+          <PropertyArt property={p} />
           <span className={`status-pill ${p.status}`}>
             <i />
-            {p.status}
+            {statusLabel[p.status]}
           </span>
         </div>
       )}
@@ -84,25 +115,37 @@ export function PropertyPanel({
         </h2>
         <p className="muted">
           {p.ad?.description ||
-            "A place for your next big idea. Give your brand a home in the city."}
+            (p.building?.kind === "public"
+              ? p.description
+              : p.building
+                ? "Este edificio ya tiene propietario."
+                : site
+                  ? "Parcela reservada para un rascacielos. Inventario premium para grandes marcas."
+                  : p.status === "reserved"
+                    ? "Alguien está construyendo aquí ahora mismo. Elige otro solar o vuelve en unos minutos."
+                    : "Construye aquí tu propio edificio.")}
         </p>
         <div className="property-facts">
           <span>
             <Eye size={15} />
-            {p.views} views
+            {p.views} visitas
           </span>
           <span>
             <ShieldCheck size={15} />
-            One advertiser
+            {p.building
+              ? `${p.building.floors} ${p.building.floors === 1 ? "planta" : "plantas"}`
+              : "Un solo propietario"}
           </span>
         </div>
         {p.ad ? (
           <>
             <div className="claimed-note">
-              CLAIMED BY <strong>{p.ad.brand}</strong>
+              CONSTRUIDO POR <strong>{p.ad.brand}</strong>
               <small>
-                Active until{" "}
-                {new Date(p.expiresAt!).toLocaleDateString("en-GB")}
+                Edificio {tier}
+                {tier !== "SKYSCRAPER" && tier && tier in PRESENCE
+                  ? ` · ${PRESENCE[tier as keyof typeof PRESENCE].floors}`
+                  : ""}
               </small>
             </div>
             {p.ad.website && (
@@ -117,6 +160,7 @@ export function PropertyPanel({
                 <ExternalLink size={16} />
               </a>
             )}
+            {upgrade}
             <div className="social-links">
               {(["instagram", "tiktok", "x", "linkedin"] as const).map(
                 (k) =>
@@ -135,43 +179,54 @@ export function PropertyPanel({
             </div>
             {p.ad.promo && (
               <p className="promo-code">
-                Use code: <strong>{p.ad.promo}</strong>
+                Usa el código: <strong>{p.ad.promo}</strong>
               </p>
             )}
+          </>
+        ) : p.building ? (
+          <>
+            <div className="claimed-note">
+              {p.building.kind === "public"
+                ? "EDIFICIO PÚBLICO"
+                : "EDIFICIO PRIVADO"}
+              <small>
+                {p.building.kind === "public"
+                  ? "Forma parte de la ciudad. No está a la venta."
+                  : "Su propietario lo está preparando."}
+              </small>
+            </div>
+            {upgrade}
           </>
         ) : p.status === "auction" ? (
           <>
             <div className="price-row">
               <div>
                 <small>
-                  {p.auction?.currentBid ? "Current bid" : "Starting bid"}
+                  {p.auction?.currentBid ? "Puja actual" : "Puja inicial"}
                 </small>
                 <strong>
                   {euro(p.auction?.currentBid || p.auction?.nextBid || 0)}
                 </strong>
               </div>
-              <span className="tag gold">Auction</span>
+              <span className="tag gold">Subasta</span>
             </div>
             <Link
               href={`/auctions?property=${p.id}`}
               className="button coral wide"
             >
-              View auction <ArrowUpRight size={18} />
+              Ver subasta <ArrowUpRight size={18} />
             </Link>
           </>
         ) : (
           <>
             <div className="price-row">
               <div>
-                <strong>
-                  {euro(p.prices["30"] || Object.values(p.prices)[0])}
-                </strong>
-                <span>
-                  {" "}
-                  / {p.prices["30"] ? "30" : Object.keys(p.prices)[0]} days
-                </span>
+                <small>{site ? "Precio orientativo" : "Desde"}</small>
+                <strong>{euro(p.price)}</strong>
               </div>
-              <span className="tag">One-time payment</span>
+              <span className="tag">
+                {site ? "Inventario premium" : "Pago único"}
+              </span>
             </div>
             <button
               disabled={p.status !== "available"}
@@ -179,25 +234,30 @@ export function PropertyPanel({
               onClick={onClaim}
             >
               {p.status === "reserved"
-                ? p.reservedForBrands
-                  ? "Reserved for major brands"
-                  : "Temporarily reserved"
-                : p.status === "claimed"
-                  ? "Claimed · ad under review"
-                  : `Claim this building`}
-              <ArrowUpRight size={18} />
+                ? site
+                  ? siteNote(p).charAt(0) + siteNote(p).slice(1).toLowerCase()
+                  : "Reservado temporalmente"
+                : site
+                  ? "Construir rascacielos"
+                  : "CONSTRUIR AQUÍ"}
+              {p.status === "available" ? (
+                <Hammer size={17} />
+              ) : (
+                <ArrowUpRight size={18} />
+              )}
             </button>
             <div className="microcopy">
               <Clock size={12} />
-              No account needed. Yours in a minute.
+              Pago único · Sin registro
             </div>
           </>
         )}
         <div className="panel-footer">
           <Link href={propertyUrl(p)}>
-            View building page <ArrowUpRight size={13} />
+            {p.building ? "Ver página del edificio" : "Ver página del solar"}{" "}
+            <ArrowUpRight size={13} />
           </Link>
-          <button onClick={onShare} aria-label="Share this building">
+          <button onClick={onShare} aria-label="Compartir">
             <Share2 size={15} />
           </button>
         </div>

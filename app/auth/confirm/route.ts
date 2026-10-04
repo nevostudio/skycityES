@@ -20,7 +20,7 @@ export async function GET(req: Request) {
         );
         if (!link)
           throw new DomainError(
-            "This link has expired or has already been used.",
+            "Este enlace ha caducado o ya se ha utilizado.",
             403,
           );
         link.used = true;
@@ -53,7 +53,10 @@ export async function GET(req: Request) {
                 : "email",
           });
       if (result.error)
-        throw new DomainError("Your access link is invalid or expired.", 403);
+        throw new DomainError(
+          "Tu enlace de acceso no es válido o ha caducado.",
+          403,
+        );
     }
     return NextResponse.redirect(`${appUrl()}/my-buildings`);
   } catch (e) {

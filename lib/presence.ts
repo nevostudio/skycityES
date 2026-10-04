@@ -1,4 +1,4 @@
-import type { PresenceTier, Property, State } from "@/types";
+import type { BuildingTier, PresenceTier, Property, State } from "@/types";
 
 export const PRESENCE_TIERS = [
   "STARTER",
@@ -7,68 +7,88 @@ export const PRESENCE_TIERS = [
   "PREMIUM",
   "LANDMARK",
 ] as const;
+/** One-time prices. Skyscrapers are premium inventory and never use these tiers. */
 export const PRESENCE = {
   STARTER: {
     price: 3,
-    height: 1,
-    description: "A beautiful base building with your brand sign.",
+    floors: "1–2 plantas",
+    description: "Un edificio pequeño con el rótulo de tu marca.",
   },
   PLUS: {
     price: 7,
-    height: 1.35,
-    description: "More height, a larger sign and facade accents.",
+    floors: "2–3 plantas",
+    description: "Más altura, un rótulo más grande y detalles en la fachada.",
   },
   PRO: {
     price: 15,
-    height: 1.85,
-    description: "A bigger presence with a branded facade billboard.",
+    floors: "3–5 plantas",
+    description: "Un edificio con presencia y una valla en la fachada.",
   },
   PREMIUM: {
     price: 30,
-    height: 2.5,
-    description: "Rooftop signage, accent lighting and a sculpted crown.",
+    floors: "5–8 plantas",
+    description:
+      "Rótulo en la azotea, iluminación de acento y un remate esculpido.",
   },
   LANDMARK: {
     price: 60,
-    height: 3.3,
+    floors: "Gran edificio",
     description:
-      "A signature building with a large screen and illuminated details.",
+      "Un edificio emblemático con pantalla grande y detalles iluminados.",
   },
 } satisfies Record<
   PresenceTier,
-  { price: number; height: number; description: string }
+  { price: number; floors: string; description: string }
 >;
-export const presenceLevel = (tier?: PresenceTier) =>
-  PRESENCE_TIERS.indexOf(tier || "STARTER");
-export function claimPrice(
-  p: Property,
-  tier: PresenceTier = "STARTER",
-  days = 30,
-) {
-  return p.inventory === "skyscraper"
-    ? p.prices[String(days)]
-    : PRESENCE[tier].price;
+export const presenceLevel = (tier?: BuildingTier) =>
+  tier === "SKYSCRAPER" ? 5 : PRESENCE_TIERS.indexOf(tier || "STARTER");
+export function claimPrice(p: Property, tier: PresenceTier = "STARTER") {
+  return p.inventory === "skyscraper" ? p.price : PRESENCE[tier].price;
 }
-/** Shared by the city, selection camera and previews. Width, depth and address never change. */
-export function visualProperty<T extends Property>(
+export const upgradePrice = (from: PresenceTier, to: PresenceTier) =>
+  PRESENCE[to].price - PRESENCE[from].price;
+
+export const FLOOR_HEIGHT = 1;
+/** Ground floor (shopfront + awning) is taller than the floors above. */
+export const GROUND_FLOOR_HEIGHT = 2;
+/** Height of an empty plot (terrain + foundations). */
+export const PLOT_HEIGHT = 0.3;
+/**
+ * STARTER < PLUS < PRO < PREMIUM < LANDMARK << SKYSCRAPER for every model,
+ * with a little variety between neighbours.
+ */
+export function buildingFloors(tier: BuildingTier, model = 0) {
+  const step = model % 3 === 2 ? 1 : 0;
+  switch (tier) {
+    case "STARTER":
+      return 1 + step;
+    case "PLUS":
+      return 2 + step;
+    case "PRO":
+      return 3 + (model % 3);
+    case "PREMIUM":
+      return 6 + (model % 3);
+    case "LANDMARK":
+      return 10 + (model % 2);
+    case "SKYSCRAPER":
+      return 24 + (model % 3) * 3;
+  }
+}
+export const buildingHeight = (tier: BuildingTier, model = 0) =>
+  GROUND_FLOOR_HEIGHT + (buildingFloors(tier, model) - 1) * FLOOR_HEIGHT + 0.2;
+
+/** Same plot, same footprint: only the height depends on what is built on it. */
+export function withBuilding<T extends Property>(
   p: T,
-  tier: PresenceTier = "STARTER",
+  tier: BuildingTier | null,
 ): T {
-  const baseHeight = p.baseHeight ?? p.height;
-  const height =
-    p.inventory === "skyscraper"
-      ? Math.max(25, baseHeight)
-      : Math.min(
-          14,
-          Math.max(
-            2.6,
-            Math.min(4.2, baseHeight * (baseHeight > 5 ? 0.42 : 1)),
-          ) * PRESENCE[tier].height,
-        );
-  return { ...p, baseHeight, height };
+  return {
+    ...p,
+    height: tier ? buildingHeight(tier, p.model) : PLOT_HEIGHT,
+  };
 }
 
-/** Additive, versioned migration: never reprice a pending checkout or alter a lease's term/content. */
+/** Additive, versioned migration: never reprice a pending checkout or alter a lease's content. */
 export function migratePresence(s: State) {
   if (s.settings[0].pricingVersion === 1) return s;
   const major = [14, 32, 43, 50, 68, 83, 158, 166];

@@ -4,8 +4,9 @@ import { Copy, Check, Download, ArrowUpRight } from "lucide-react";
 import type { PublicProperty } from "@/types";
 import { Modal } from "../modal";
 import { Brand } from "../brand";
-import { BuildingArt } from "./building-art";
-import { propertyUrl } from "@/lib/client";
+import { PropertyArt } from "./building-art";
+import { districtName, propertyUrl } from "@/lib/client";
+import { DISTRICTS_ES } from "@/lib/plots";
 import { track } from "@/lib/analytics/client";
 export function ShareModal({
   property: p,
@@ -22,34 +23,39 @@ export function ShareModal({
       ? `${location.origin}${propertyUrl(p)}`
       : propertyUrl(p);
   const text = celebrate
-    ? "I just claimed a building in SkyCity. Come find your spot!"
-    : "A little corner of SkyCity. Come find your spot!";
+    ? "Acabo de construir mi edificio en SkyCity. ¡Ven a elegir tu solar!"
+    : "Un pequeño rincón de SkyCity. ¡Ven a elegir tu solar!";
   return (
     <Modal
-      title={celebrate ? "YOU’RE IN SKYCITY" : "GOOD THINGS ARE BETTER SHARED"}
+      title={celebrate ? "YA ESTÁS EN SKYCITY" : "LO BUENO SE COMPARTE"}
       onClose={onClose}
     >
-      <h2>
-        {celebrate ? "Welcome to the neighborhood." : "Put it on their radar."}
-      </h2>
+      <h2>{celebrate ? "Bienvenido al barrio." : "Ponlo en su radar."}</h2>
       <p className="muted">
         {celebrate
-          ? "Your brand is part of the city. Tell the world."
-          : "Send a little piece of the city to someone."}
+          ? "Tu edificio ya forma parte de la ciudad. Cuéntaselo al mundo."
+          : "Envía un pedacito de la ciudad a alguien."}
       </p>
       <div className="share-card">
         <Brand />
         {p.ad?.logo && (
           <img
             src={p.ad.logo}
-            alt={`${p.ad.brand} logo`}
+            alt={`Logo de ${p.ad.brand}`}
             className="share-brand-logo"
           />
         )}
-        <BuildingArt property={p} brand={p.ad?.brand} />
-        <span className="eyebrow">{p.districtId.replaceAll("-", " ")}</span>
+        <PropertyArt property={p} brand={p.ad?.brand} />
+        <span className="eyebrow">
+          {districtName(
+            p.districtId,
+            Object.entries(DISTRICTS_ES).map(([id, d]) => ({ id, ...d })),
+          )}
+        </span>
         <h3>{p.ad?.brand || p.name}</h3>
-        <p>{celebrate ? "I just claimed a building in SkyCity." : p.name}</p>
+        <p>
+          {celebrate ? "Acabo de construir mi edificio en SkyCity." : p.name}
+        </p>
         <span className="share-address">
           SKYCITY / #{String(p.number).padStart(3, "0")}
         </span>
@@ -95,14 +101,14 @@ export function ShareModal({
         }}
       >
         {copied ? <Check size={16} /> : <Copy size={16} />}{" "}
-        {copied ? "Link copied" : "Copy building link"}
+        {copied ? "Enlace copiado" : "Copiar enlace"}
       </button>
       <a
         className="download-link"
         href={`/api/og/${p.id}`}
         download={`skycity-${p.id}.png`}
       >
-        <Download size={14} /> Download share card
+        <Download size={14} /> Descargar tarjeta para compartir
       </a>
     </Modal>
   );

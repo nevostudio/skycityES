@@ -1,8 +1,8 @@
 "use client";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import type { CityData, PublicProperty } from "@/types";
-import { BuildingArt } from "../property/building-art";
-import { euro, offerPrice, offerDays } from "@/lib/client";
+import { PropertyArt } from "../property/building-art";
+import { euro } from "@/lib/client";
 export function FeaturedLocations({
   data,
   choose,
@@ -17,8 +17,8 @@ export function FeaturedLocations({
     <section className="featured">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">A FEW PLACES YOU MIGHT LOVE</span>
-          <h2>Location, location, your location.</h2>
+          <span className="eyebrow">ALGUNOS SITIOS QUE TE PUEDEN ENCANTAR</span>
+          <h2>Ubicación, ubicación, tu ubicación.</h2>
         </div>
         <button
           className="text-button"
@@ -26,7 +26,7 @@ export function FeaturedLocations({
             onExplore();
           }}
         >
-          Explore all spots <ArrowRight size={16} />
+          Ver todos los solares <ArrowRight size={16} />
         </button>
       </div>
       <div className="featured-grid">
@@ -46,14 +46,12 @@ export function FeaturedLocations({
                 className={`card-badge ${p.sale === "auction" ? "gold" : ""}`}
               >
                 {p.sale === "auction"
-                  ? "ICONIC LOCATION"
+                  ? "PARCELA PREMIUM"
                   : p.tier === "POPULAR"
-                    ? "NEIGHBORHOOD FAVORITE"
-                    : p.tier === "PREMIUM"
-                      ? "STAND A LITTLE TALLER"
-                      : "MAKE YOUR MARK"}
+                    ? "FAVORITO DEL BARRIO"
+                    : "DEJA TU HUELLA"}
               </span>
-              <BuildingArt property={p} brand={p.ad?.brand} />
+              <PropertyArt property={p} brand={p.ad?.brand} />
               <span className="card-arrow">
                 <ArrowUpRight size={19} />
               </span>
@@ -67,19 +65,17 @@ export function FeaturedLocations({
                 <span>
                   <i className={`status-dot ${p.status}`} />
                   {p.status === "auction"
-                    ? "Auction live"
-                    : p.status === "claimed"
-                      ? "Claimed"
-                      : "Available to claim"}
+                    ? "Subasta en directo"
+                    : p.building
+                      ? "Construido"
+                      : "Disponible para construir"}
                 </span>
                 <strong>
                   {p.sale === "auction"
                     ? euro(p.auction?.nextBid || 0)
-                    : euro(offerPrice(p))}
+                    : euro(p.price)}
                   <small>
-                    {p.sale === "auction"
-                      ? " min. bid"
-                      : ` / ${offerDays(p)} days`}
+                    {p.sale === "auction" ? " puja mín." : " pago único"}
                   </small>
                 </strong>
               </div>

@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { CTAS, LEGACY_CTAS } from "./plots";
+// Validation messages reach the interface: keep them in Spanish.
+z.config(z.locales.es());
 const url = z
   .string()
   .max(2048)
@@ -17,7 +20,7 @@ const url = z
     } catch {
       return false;
     }
-  }, "Use a valid HTTPS URL");
+  }, "Usa una URL HTTPS válida");
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 export const adSchema = z.object({
   brand: z.string().trim().min(2).max(40),
@@ -30,14 +33,10 @@ export const adSchema = z.object({
   logo: url,
   banner: url,
   promo: z.string().max(40),
-  cta: z.enum([
-    "Visit website",
-    "Shop now",
-    "Follow me",
-    "Learn more",
-    "View project",
-    "Contact us",
-  ]),
+  cta: z.preprocess(
+    (v) => (typeof v === "string" && LEGACY_CTAS[v]) || v,
+    z.enum(CTAS),
+  ),
   primary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   secondary: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   style: z.enum(["rooftop", "facade", "billboard"]),
@@ -48,9 +47,7 @@ export const adSchema = z.object({
 export const claimSchema = z.object({
   propertyId: z.string().max(80),
   email: emailSchema,
-  days: z.number().int().positive().max(365),
   ad: adSchema,
-  renewalLeaseId: z.string().optional(),
   upgradeLeaseId: z.string().optional(),
   presenceTier: z
     .enum(["STARTER", "PLUS", "PRO", "PREMIUM", "LANDMARK"])

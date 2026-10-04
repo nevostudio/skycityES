@@ -11,8 +11,7 @@ export async function POST(req: Request) {
     checkOrigin(req);
     rateLimit(`checkout:${req.headers.get("x-forwarded-for") || "local"}`, 20);
     const input = claimSchema.parse(await req.json());
-    if (input.renewalLeaseId || input.upgradeLeaseId)
-      input.email = (await requireIdentity()).email;
+    if (input.upgradeLeaseId) input.email = (await requireIdentity()).email;
     const demo = isDemo();
     const result = await transaction((s) =>
       reserve(s, { ...input, ad: input.ad as Ad }, demo),

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/header";
-import { BuildingArt } from "@/components/property/building-art";
+import { PropertyArt } from "@/components/property/building-art";
 import { ShareModal } from "@/components/property/share-modal";
 import { api, propertyUrl } from "@/lib/client";
 import type { CityData, PublicProperty } from "@/types";
@@ -30,7 +30,7 @@ export default function Page() {
           done = true;
         } else if (status.status === "expired") {
           setError(
-            "This reservation has expired. If you were charged, please contact the city administrator.",
+            "Esta reserva ha caducado. Si se ha realizado el cobro, contacta con la administración de la ciudad.",
           );
           done = true;
         }
@@ -55,42 +55,45 @@ export default function Page() {
         >
           {p ? (
             <>
-              <span className="eyebrow">BUILDING CLAIMED</span>
-              <h1>You’re in SkyCity.</h1>
-              <BuildingArt property={p} brand={p.ad?.brand} />
+              <span className="eyebrow">EDIFICIO CONSTRUIDO</span>
+              <h1>Ya estás en SkyCity.</h1>
+              <PropertyArt property={p} brand={p.ad?.brand} />
               <h2>{p.name}</h2>
               <p>
-                {p.ad?.brand} · Active until{" "}
-                {new Date(p.expiresAt!).toLocaleDateString("en-GB")}
+                {p.ad?.brand} · Edificio {p.building?.tier} · Pago único
               </p>
-              <Link className="button coral wide" href={propertyUrl(p)}>
-                View my building ↗
+              <Link
+                className="button coral wide"
+                href={`/?building=${p.id}&obra=1`}
+              >
+                Verlo construirse en la ciudad ↗
+              </Link>
+              <Link className="button outline wide" href={propertyUrl(p)}>
+                Página de mi edificio
               </Link>
               <div className="card-actions" style={{ marginTop: 10 }}>
                 <button
                   className="button outline"
                   onClick={() => setShare(true)}
                 >
-                  Share my spot
+                  Compartir
                 </button>
                 <Link href="/my-buildings" className="button outline">
-                  Edit advertisement
+                  Editar anuncio
                 </Link>
               </div>
             </>
           ) : (
             <>
               <h2>
-                {error
-                  ? "Let’s check your claim."
-                  : "Your new address is on its way."}
+                {error ? "Revisemos tu compra." : "Tu edificio está en camino."}
               </h2>
               <p>
                 {error ||
-                  "Waiting for verified payment confirmation. This page will update automatically."}
+                  "Esperando la confirmación verificada del pago. Esta página se actualizará sola."}
               </p>
               <Link className="button outline" href="/my-buildings">
-                My buildings
+                Mis edificios
               </Link>
             </>
           )}

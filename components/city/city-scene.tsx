@@ -6,9 +6,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 import type { District, PublicProperty } from "@/types";
-import { euro, offerPrice, offerDays } from "@/lib/client";
+import { euro, siteNote } from "@/lib/client";
+import { FLOOR_HEIGHT, GROUND_FLOOR_HEIGHT } from "@/lib/presence";
 
-import { Building, Block, box, leaf, palette } from "./building";
+import {
+  Building,
+  Block,
+  box,
+  leaf,
+  palette,
+  type Construction,
+} from "./building";
+import { PlotField, PlotHighlight, PremiumSite } from "./plots";
 import { brandKind } from "./brand-sign";
 import { districtStyle } from "./district-style";
 import { useSceneMotion } from "./scene-motion";
@@ -54,35 +63,38 @@ function Instances({
 function Details({
   properties,
   districts,
-  faded,
+  hidden,
 }: {
   properties: PublicProperty[];
   districts: District[];
-  faded: Set<string>;
+  hidden: Set<string>;
 }) {
   const windows = useMemo(
     () =>
       properties.flatMap((p) => {
-        if (faded.has(p.id)) return [];
+        if (!p.building || hidden.has(p.id)) return [];
         const a: {
           p: [number, number, number];
           s: [number, number, number];
           c: string;
           r?: number;
         }[] = [];
-        for (let y = 1.2; y < p.height - 0.6; y += 1.5)
+        // One row per upper floor; the taller ground floor keeps its shopfront.
+        for (let f = 1; f < p.building.floors; f++) {
+          const y = GROUND_FLOOR_HEIGHT + (f - 1) * FLOOR_HEIGHT + 0.5;
           for (let j = -1; j <= 1; j++) {
             a.push({
               p: [p.x + j * 0.72, y + 0.32, p.z + p.depth / 2 + 0.025],
-              s: [0.42, 0.7, 0.045],
+              s: [0.42, 0.55, 0.045],
               c: windowColor(p),
             });
             a.push({
               p: [p.x + p.width / 2 + 0.025, y + 0.32, p.z + j * 0.82],
-              s: [0.045, 0.7, 0.46],
+              s: [0.045, 0.55, 0.46],
               c: windowColor(p),
             });
           }
+        }
         return a.map((item) => {
           const x = item.p[0] - p.x,
             z = item.p[2] - p.z;
@@ -97,7 +109,7 @@ function Details({
           };
         });
       }),
-    [properties, faded],
+    [properties, hidden],
   );
   const trees = useMemo(() => {
     const a: {
@@ -123,7 +135,7 @@ function Details({
         c: i % 2 ? "#8eab7b" : "#789969",
       });
     return a;
-  }, [districts, properties, faded]);
+  }, [districts]);
   const trunks = useMemo(
     () =>
       trees.map((t) => ({
@@ -180,9 +192,21 @@ function windowColor(p: PublicProperty) {
       ? "#81608f"
       : kind === "garden"
         ? "#93aa76"
-        : p.status === "auction"
-          ? "#bbac87"
-          : districtStyle(p.districtId).glass;
+        : districtStyle(p.districtId).glass;
+}
+const noConstruction: Record<string, Construction> = {};
+function tooltipLine(p: PublicProperty) {
+  if (p.inventory === "skyscraper" && !p.building) {
+    const note = siteNote(p).toLowerCase();
+    return note.charAt(0).toUpperCase() + note.slice(1);
+  }
+  if (p.status === "available") return `Desde ${euro(p.price)}`;
+  if (p.status === "reserved") return "Alguien está construyendo aquí";
+  if (p.status === "public") return "Edificio de la ciudad";
+  if (p.status === "auction") return "Subasta en directo";
+  return p.ad
+    ? `Edificio ${p.building?.tier} · Ver edificio ↗`
+    : `Edificio ${p.building?.tier}`;
 }
 function Car({
   offset,
@@ -356,6 +380,8 @@ export default function CityScene({
   focus,
   zoomAction,
   resetKey,
+  constructing = noConstruction,
+  onBuilt,
 }: {
   properties: PublicProperty[];
   districts: District[];
@@ -365,15 +391,39 @@ export default function CityScene({
   focus: District | null;
   zoomAction: number;
   resetKey: number;
+  constructing?: Record<string, Construction>;
+  onBuilt?: (id: string) => void;
 }) {
   const [hover, setHover] = useState<PublicProperty | null>(null);
   const selectedProperty = properties.find((p) => p.id === selected);
+  const visible = useMemo(() => new Set(matching), [matching]);
+  const { built, plots, sites } = useMemo(
+    () => ({
+      built: properties.filter((p) => p.building),
+      plots: properties.filter(
+        (p) => !p.building && p.inventory !== "skyscraper",
+      ),
+      sites: properties.filter(
+        (p) => !p.building && p.inventory === "skyscraper",
+      ),
+    }),
+    [properties],
+  );
+  const mutedPlots = useMemo(
+    () => new Set(plots.filter((p) => !visible.has(p.id)).map((p) => p.id)),
+    [plots, visible],
+  );
   const faded = useMemo(
     () =>
       new Set(
         properties
           .filter((p) => {
-            if (!selectedProperty || p.id === selectedProperty.id) return false;
+            if (
+              !selectedProperty ||
+              p.id === selectedProperty.id ||
+              !p.building
+            )
+              return false;
             const dx = p.x - selectedProperty.x,
               dz = p.z - selectedProperty.z;
             return (
@@ -384,6 +434,17 @@ export default function CityScene({
           .map((p) => p.id),
       ),
     [properties, selectedProperty],
+  );
+  const hiddenWindows = useMemo(
+    () => new Set([...faded, ...Object.keys(constructing)]),
+    [faded, constructing],
+  );
+  const highlighted = [hover, selectedProperty].filter(
+    (p, i, all): p is PublicProperty =>
+      !!p &&
+      !p.building &&
+      p.inventory !== "skyscraper" &&
+      all.findIndex((v) => v?.id === p.id) === i,
   );
   return (
     <Canvas
@@ -479,18 +540,59 @@ export default function CityScene({
         <circleGeometry args={[5, 32]} />
         <meshStandardMaterial color="#8ebbb5" />
       </mesh>
-      <Block position={[52, 0.5, 24]} scale={[21, 0.5, 4]} color="#e2dcc7" />
-      <Details properties={properties} districts={districts} faded={faded} />
+      {[-48, -12, 24, 60].map((z) => (
+        <group key={`bridge${z}`} name="bridge">
+          <Block
+            position={[54, 0.5, z]}
+            scale={[16, 0.5, 4.6]}
+            color="#e2dcc7"
+          />
+          {[-1, 1].map((side) => (
+            <Block
+              key={side}
+              position={[54, 1.05, z + side * 2.2]}
+              scale={[16, 0.5, 0.18]}
+              color="#cfc7ae"
+            />
+          ))}
+        </group>
+      ))}
+      <Details
+        properties={built}
+        districts={districts}
+        hidden={hiddenWindows}
+      />
       <NeighborhoodDetails districts={districts} />
       <RiverLife />
-      {properties.map((p) => (
+      <PlotField
+        plots={plots}
+        muted={mutedPlots}
+        onSelect={onSelect}
+        onHover={setHover}
+      />
+      {highlighted.map((p) => (
+        <PlotHighlight key={p.id} p={p} selected={p.id === selected} />
+      ))}
+      {sites.map((p) => (
+        <PremiumSite
+          key={p.id}
+          p={p}
+          selected={selected === p.id}
+          muted={!visible.has(p.id)}
+          showAuctionLabel={!selected || selected === p.id}
+          onSelect={onSelect}
+          onHover={setHover}
+        />
+      ))}
+      {built.map((p) => (
         <Building
           key={p.id}
           p={p}
           selected={selected === p.id}
-          muted={!matching.includes(p.id)}
+          muted={!visible.has(p.id)}
           faded={faded.has(p.id)}
-          showAuctionLabel={!selected || selected === p.id}
+          construction={constructing[p.id]}
+          onBuilt={onBuilt}
           onSelect={onSelect}
           onHover={setHover}
         />
@@ -503,7 +605,13 @@ export default function CityScene({
       <Car offset={67} color="#dbc5ab" axis="z" lane={18.8} speed={-0.65} />
       {hover && hover.id !== selected && (
         <Html
-          position={[hover.x, hover.height + 4, hover.z]}
+          position={[
+            hover.x,
+            (hover.inventory === "skyscraper" && !hover.building
+              ? 8
+              : hover.height) + 3,
+            hover.z,
+          ]}
           center
           zIndexRange={[8, 5]}
           style={{ pointerEvents: "none" }}
@@ -512,14 +620,14 @@ export default function CityScene({
             <span className={`status-dot ${hover.status}`} />
             {hover.ad?.logo && <img src={hover.ad.logo} alt="" />}
             <strong>{hover.ad?.brand || hover.name}</strong>
-            <small>
-              {hover.status === "available"
-                ? `${euro(offerPrice(hover))} / ${offerDays(hover)} days`
-                : hover.ad
-                  ? "View building ↗"
-                  : hover.status.toUpperCase()}
-            </small>
-            {hover.status === "available" && <em>CLAIM THIS SPOT ↗</em>}
+            <small>{tooltipLine(hover)}</small>
+            {hover.status === "available" && (
+              <em>
+                {hover.inventory === "skyscraper"
+                  ? "PARCELA PREMIUM ↗"
+                  : "CONSTRUIR AQUÍ ↗"}
+              </em>
+            )}
           </div>
         </Html>
       )}

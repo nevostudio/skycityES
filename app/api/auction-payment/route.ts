@@ -7,7 +7,9 @@ export async function POST(req: Request) {
   try {
     checkOrigin(req);
     if (isDemo())
-      throw new DomainError("Demo auctions settle without a payment.");
+      throw new DomainError(
+        "Las subastas de demostración se liquidan sin pago.",
+      );
     const { reservation, access } = await req.json();
     const s = await readState();
     const r = s.reservations.find((r) => r.id === reservation);
@@ -18,14 +20,17 @@ export async function POST(req: Request) {
       r.status !== "reserved" ||
       Date.parse(r.expiresAt) <= Date.now()
     )
-      throw new DomainError("Payment link is invalid or expired.", 403);
+      throw new DomainError(
+        "El enlace de pago no es válido o ha caducado.",
+        403,
+      );
     if (!s.auctions.some((a) => a.reservationId === r.id))
-      throw new DomainError("Auction not found");
+      throw new DomainError("Subasta no encontrada");
     if (r.sessionId) {
       const existing = await stripe().checkout.sessions.retrieve(r.sessionId);
       if (existing.status === "open")
         return Response.json({ url: existing.url });
-      throw new DomainError("This checkout is already complete or expired.");
+      throw new DomainError("Este pago ya se completó o ha caducado.");
     }
     const session = await createSession(r, access);
     await transaction((s) => {

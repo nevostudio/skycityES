@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type {
   Ad,
+  Building,
   CityData,
   EventName,
   PublicProperty,
@@ -9,7 +10,14 @@ import type {
   PresenceTier,
 } from "@/types";
 import { emptyAd } from "./seed";
-import { PRESENCE, claimPrice, visualProperty } from "./presence";
+import {
+  PRESENCE,
+  buildingFloors,
+  claimPrice,
+  upgradePrice,
+  withBuilding,
+} from "./presence";
+import { makeBuilding } from "./plots";
 export class DomainError extends Error {
   constructor(
     message: string,
@@ -18,6 +26,8 @@ export class DomainError extends Error {
     super(message);
   }
 }
+/** How long a freshly built or upgraded building reports CONSTRUCTING. */
+export const CONSTRUCTION_MS = 2000;
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export const token = () => randomBytes(32).toString("hex");
 export function queueMail(
@@ -49,6 +59,7 @@ export function metric(
   if (row) row.count++;
   else s.analytics.push({ id, propertyId, event, day, count: 1 });
 }
+/** Buildings are a one-time purchase: only checkouts and auctions expire. */
 export function sweep(s: State, now = Date.now()) {
   for (const r of s.reservations)
     if (
@@ -66,32 +77,25 @@ export function sweep(s: State, now = Date.now()) {
     )
       auction.status = "closed";
   }
-  for (const l of s.leases)
-    if (l.status === "active") {
-      const left = Date.parse(l.expiresAt) - now;
-      if (left <= 0) {
-        l.status = "expired";
-        queueMail(
-          s,
-          l.email,
-          "Your SkyCity spot is available again",
-          `Your lease for ${l.propertyId} has expired. Explore the city to claim it again.`,
-          `expired:${l.id}:${l.expiresAt}`,
-        );
-      } else
-        for (const days of [7, 3, 1])
-          if (
-            left <= days * 86400000 &&
-            left > (days === 7 ? 3 : days === 3 ? 1 : 0) * 86400000
-          )
-            queueMail(
-              s,
-              l.email,
-              `${days === 1 ? "24 hours" : `${days} days`} remaining in SkyCity`,
-              `Renew ${l.propertyId} from My Buildings before ${l.expiresAt}.`,
-              `reminder:${l.id}:${l.expiresAt}:${days}`,
-            );
-    }
+}
+const activeLeaseFor = (s: State, propertyId: string) =>
+  s.leases.find((l) => l.propertyId === propertyId && l.status === "active");
+export const buildingFor = (s: State, propertyId: string) =>
+  s.buildings.find((b) => b.propertyId === propertyId);
+function buildingView(b: Building, model: number, now: number) {
+  const changed = Date.parse(b.upgradedAt || b.builtAt);
+  return {
+    state:
+      now - changed < CONSTRUCTION_MS
+        ? ("CONSTRUCTING" as const)
+        : ("BUILT" as const),
+    tier: b.tier,
+    kind: b.kind,
+    floors: buildingFloors(b.tier, model),
+    builtAt: b.builtAt,
+    upgradedAt: b.upgradedAt,
+    previousTier: b.previousTier,
+  };
 }
 export function citySnapshot(
   s: State,
@@ -101,16 +105,13 @@ export function citySnapshot(
   const properties: PublicProperty[] = s.properties
     .filter((p) => p.enabled)
     .map((p) => {
-      const lease = s.leases.find(
-        (l) =>
-          l.propertyId === p.id &&
-          l.status === "active" &&
-          Date.parse(l.expiresAt) > now,
-      );
+      const lease = activeLeaseFor(s, p.id);
+      const b = buildingFor(s, p.id);
       const reserved = s.reservations.some(
         (r) =>
           r.propertyId === p.id &&
           r.status === "reserved" &&
+          !r.upgradeLeaseId &&
           (r.sessionId || Date.parse(r.expiresAt) > now),
       );
       const a = s.auctions.find(
@@ -125,22 +126,20 @@ export function citySnapshot(
             .sort((a, b) => b.amount - a.amount)
         : [];
       return {
-        ...visualProperty(p, lease?.presenceTier),
-        presenceTier: lease?.presenceTier || "STARTER",
-        prices: Object.fromEntries(
-          Object.entries(p.prices).filter(([days]) =>
-            s.settings[0].durations.includes(Number(days)),
-          ),
-        ),
-        status: lease
-          ? "claimed"
-          : reserved || p.reservedForBrands
-            ? "reserved"
-            : a || p.sale === "auction"
-              ? "auction"
-              : "available",
+        ...withBuilding(p, b?.tier ?? null),
+        building: b ? buildingView(b, p.model, now) : null,
+        presenceTier: lease?.presenceTier,
+        status:
+          b?.kind === "public"
+            ? "public"
+            : lease || b
+              ? "claimed"
+              : reserved || p.reservedForBrands
+                ? "reserved"
+                : a || p.sale === "auction"
+                  ? "auction"
+                  : "available",
         ad: lease?.ad.status === "active" ? lease.ad : undefined,
-        expiresAt: lease?.expiresAt,
         views: s.analytics
           .filter((e) => e.propertyId === p.id && e.event === "property_open")
           .reduce((a, e) => a + e.count, 0),
@@ -152,39 +151,44 @@ export function citySnapshot(
                 ? bids[0].amount + a.increment
                 : a.startingBid,
               bidders: new Set(bids.map((b) => b.email)).size,
-              history: bids.slice(0, 8).map((b, i) => ({
+              history: bids.slice(0, 8).map((b) => ({
                 amount: b.amount,
                 createdAt: b.createdAt,
-                bidder: `Bidder ${b.email.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 999}`,
+                bidder: `Postor ${b.email.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 999}`,
               })),
             }
           : undefined,
       };
     });
-  const claimed = properties.filter((p) => p.status === "claimed").length;
+  const built = properties.filter((p) => p.building);
+  const today = new Date(now).toISOString().slice(0, 10);
+  const standing = new Set(built.map((p) => p.id));
   return {
     demo,
     properties,
     districts: s.districts,
-    activity: s.activity.slice(-30).reverse(),
-    durations: s.settings[0].durations,
+    // Retired seed showcases no longer stand in the city.
+    activity: s.activity
+      .filter(
+        (a) => !a.id.startsWith("seed-activity-") || standing.has(a.propertyId),
+      )
+      .slice(-30)
+      .reverse(),
     stats: {
-      total: properties.length,
-      claimed,
+      plots: properties.length,
+      built: built.length,
+      privateBuilt: built.filter((p) => p.building!.kind === "private").length,
+      publicBuilt: built.filter((p) => p.building!.kind === "public").length,
       available: properties.filter((p) => p.status === "available").length,
       reserved: properties.filter((p) => p.status === "reserved").length,
-      advertisers: new Set(
-        s.leases
-          .filter((l) => l.status === "active" && Date.parse(l.expiresAt) > now)
-          .map((l) => l.email),
-      ).size,
-      occupancy: properties.length
-        ? Math.round((claimed / properties.length) * 100)
+      builtPercent: properties.length
+        ? Math.round((built.length / properties.length) * 100)
         : 0,
-      claimsToday: s.activity.filter(
-        (a) =>
-          a.action === "claimed" &&
-          a.createdAt.slice(0, 10) === new Date(now).toISOString().slice(0, 10),
+      owners: new Set(
+        s.leases.filter((l) => l.status === "active").map((l) => l.email),
+      ).size,
+      builtToday: s.activity.filter(
+        (a) => a.action === "claimed" && a.createdAt.slice(0, 10) === today,
       ).length,
       auctions: properties.filter((p) => p.auction).length,
     },
@@ -195,19 +199,23 @@ export function reserve(
   input: {
     propertyId: string;
     email: string;
-    days: number;
     ad: Ad;
-    renewalLeaseId?: string;
     upgradeLeaseId?: string;
+    renewalLeaseId?: string;
     presenceTier?: PresenceTier;
   },
   demo: boolean,
   now = Date.now(),
 ) {
   sweep(s, now);
+  if (input.renewalLeaseId)
+    throw new DomainError(
+      "Los edificios son de pago único: no hay renovaciones.",
+    );
   const p = s.properties.find((p) => p.id === input.propertyId && p.enabled);
   if (
     !p ||
+    p.inventory === "public" ||
     p.reservedForBrands ||
     p.sale !== "rental" ||
     s.auctions.some(
@@ -216,73 +224,48 @@ export function reserve(
         ["live", "awaiting_payment"].includes(a.status),
     )
   )
-    throw new DomainError(
-      "This property is not available for a direct claim.",
-      409,
-    );
-  const existing = s.leases.find(
-    (l) => l.propertyId === p.id && l.status === "active",
-  );
-  if (
-    input.renewalLeaseId &&
-    (!existing ||
-      existing.id !== input.renewalLeaseId ||
-      existing.email !== input.email)
-  )
-    throw new DomainError("This lease cannot be renewed.", 403);
-  if (input.renewalLeaseId && input.upgradeLeaseId)
-    throw new DomainError("Choose either renewal or upgrade.");
+    throw new DomainError("Este solar no está disponible para construir.", 409);
+  const existing = activeLeaseFor(s, p.id);
   const currentTier = existing?.presenceTier || "STARTER";
-  const targetTier = input.renewalLeaseId
-    ? currentTier
-    : input.presenceTier || "STARTER";
+  const targetTier = input.presenceTier || "STARTER";
   if (!Object.hasOwn(PRESENCE, targetTier))
-    throw new DomainError("Invalid presence tier.");
+    throw new DomainError("Tamaño de edificio no válido.");
   if (input.upgradeLeaseId) {
     if (p.inventory === "skyscraper")
-      throw new DomainError("Skyscrapers have their own exclusive presence.");
+      throw new DomainError("Los rascacielos tienen su propia categoría.");
     if (
       !existing ||
       existing.id !== input.upgradeLeaseId ||
       existing.email !== input.email
     )
       throw new DomainError(
-        "Only the current owner can upgrade this lease.",
+        "Solo el propietario puede mejorar este edificio.",
         403,
       );
-    if (Date.parse(existing.expiresAt) <= now + 31 * 60000)
-      throw new DomainError(
-        "Renew your lease before upgrading; less than 31 minutes remain.",
-        409,
-      );
     if (PRESENCE[targetTier].price <= PRESENCE[currentTier].price)
-      throw new DomainError("Choose a higher presence tier.");
+      throw new DomainError("Elige un tamaño superior al actual.");
   }
-  if (existing && !input.renewalLeaseId && !input.upgradeLeaseId)
-    throw new DomainError("Someone has already claimed this building.", 409);
+  if ((existing || buildingFor(s, p.id)) && !input.upgradeLeaseId)
+    throw new DomainError("Alguien ya ha construido en este solar.", 409);
   if (
     s.reservations.some((r) => r.propertyId === p.id && r.status === "reserved")
   )
     throw new DomainError(
-      "This building is temporarily reserved. Try another spot.",
+      "Alguien está construyendo aquí ahora mismo. Prueba otro solar.",
       409,
     );
-  if (
-    (p.inventory !== "skyscraper" && input.days !== 30) ||
-    !s.settings[0].durations.includes(input.days) ||
-    !p.prices[String(input.days)]
-  )
-    throw new DomainError("Choose an available lease duration.");
   const access = token();
   const r: Reservation = {
-    ...input,
+    propertyId: input.propertyId,
+    email: input.email,
+    upgradeLeaseId: input.upgradeLeaseId,
     id: randomUUID(),
     presenceTier: p.inventory === "skyscraper" ? "LANDMARK" : targetTier,
     fromTier: input.upgradeLeaseId ? currentTier : undefined,
-    days: input.upgradeLeaseId ? 0 : input.days,
+    days: 0,
     amount: input.upgradeLeaseId
-      ? PRESENCE[targetTier].price - PRESENCE[currentTier].price
-      : claimPrice(p, targetTier, input.days),
+      ? upgradePrice(currentTier, targetTier)
+      : claimPrice(p, targetTier),
     ad: {
       ...(input.upgradeLeaseId ? existing!.ad : input.ad),
       status: s.settings[0].moderation === "review" ? "pending" : "active",
@@ -309,41 +292,38 @@ export function fulfill(
     (t) => t.id === transactionId || t.reservationId === reservationId,
   );
   if (duplicate && duplicate.reservationId !== reservationId)
-    throw new DomainError(
-      "Payment already belongs to another reservation.",
-      409,
+    throw new DomainError("Este pago ya pertenece a otra reserva.", 409);
+  if (duplicate) {
+    const r = s.reservations.find((r) => r.id === reservationId);
+    return s.leases.find(
+      (l) =>
+        l.id ===
+        (r?.upgradeLeaseId || r?.renewalLeaseId || `lease-${reservationId}`),
     );
-  if (duplicate)
-    return (
-      s.leases.find((l) => l.id === `lease-${reservationId}`) ||
-      s.leases.find(
-        (l) =>
-          l.id ===
-          (s.reservations.find((r) => r.id === reservationId)?.upgradeLeaseId ||
-            s.reservations.find((r) => r.id === reservationId)?.renewalLeaseId),
-      )
-    );
+  }
   const r = s.reservations.find((r) => r.id === reservationId);
   if (
     !r ||
     r.status !== "reserved" ||
     (provider === "demo" && Date.parse(r.expiresAt) <= now)
   )
-    throw new DomainError("This reservation has expired.", 409);
+    throw new DomainError("Esta reserva ha caducado.", 409);
   if (Math.round(amount * 100) !== Math.round(r.amount * 100))
-    throw new DomainError("Payment amount does not match reservation.", 409);
-  const occupied = s.leases.find(
-    (l) =>
-      l.propertyId === r.propertyId &&
-      l.status === "active" &&
-      Date.parse(l.expiresAt) > now,
-  );
-  if (occupied && occupied.id !== (r.upgradeLeaseId || r.renewalLeaseId))
+    throw new DomainError("El importe pagado no coincide con la reserva.", 409);
+  const p = s.properties.find((p) => p.id === r.propertyId);
+  if (!p) throw new DomainError("Solar no encontrado.", 404);
+  const occupied = activeLeaseFor(s, r.propertyId);
+  const ownLease = r.upgradeLeaseId || r.renewalLeaseId;
+  if (
+    (occupied && occupied.id !== ownLease) ||
+    (!ownLease && buildingFor(s, p.id))
+  )
     throw new DomainError(
-      "Property is already occupied. Payment needs reconciliation.",
+      "El solar ya tiene edificio. El pago necesita conciliación.",
       409,
     );
   let lease = occupied;
+  const at = new Date(now).toISOString();
   if (
     r.upgradeLeaseId &&
     (!lease ||
@@ -352,11 +332,9 @@ export function fulfill(
       (lease.presenceTier || "STARTER") !== r.fromTier)
   )
     throw new DomainError(
-      "The upgrade no longer matches this active lease. Payment needs reconciliation.",
+      "La mejora ya no coincide con el edificio actual. El pago necesita conciliación.",
       409,
     );
-  if (r.renewalLeaseId && !lease)
-    lease = s.leases.find((l) => l.id === r.renewalLeaseId);
   if (lease && r.upgradeLeaseId) {
     lease.presenceTier = r.presenceTier!;
     (lease.upgradeHistory ??= []).push({
@@ -365,28 +343,25 @@ export function fulfill(
       from: r.fromTier!,
       to: r.presenceTier!,
       amount: r.amount,
-      createdAt: new Date(now).toISOString(),
+      createdAt: at,
     });
-  } else if (lease) {
-    lease.ad = {
-      ...r.ad,
-      status: ["suspended", "rejected"].includes(lease.ad.status)
-        ? lease.ad.status
-        : r.ad.status,
-    };
-    lease.expiresAt = new Date(
-      Math.max(now, Date.parse(lease.expiresAt)) + r.days * 86400000,
-    ).toISOString();
-    lease.status = "active";
-    lease.presenceTier = r.presenceTier || lease.presenceTier || "STARTER";
+    const b = buildingFor(s, p.id);
+    if (b) {
+      b.previousTier = b.tier;
+      b.tier = r.presenceTier!;
+      b.upgradedAt = at;
+    }
+  } else if (r.renewalLeaseId) {
+    // Legacy renewal paid after the switch to one-time payments: keep the payment on record.
+    lease ??= s.leases.find((l) => l.id === r.renewalLeaseId);
+    if (!lease) throw new DomainError("Edificio no encontrado.", 404);
   } else {
     lease = {
       id: `lease-${r.id}`,
       propertyId: r.propertyId,
       email: r.email,
       ad: r.ad,
-      startsAt: new Date(now).toISOString(),
-      expiresAt: new Date(now + r.days * 86400000).toISOString(),
+      startsAt: at,
       status: "active",
       demo: provider === "demo",
       autoRenew: false,
@@ -395,6 +370,14 @@ export function fulfill(
       upgradeHistory: [],
     };
     s.leases.push(lease);
+    s.buildings.push(
+      makeBuilding(
+        p,
+        p.inventory === "skyscraper" ? "SKYSCRAPER" : lease.presenceTier!,
+        at,
+        { id: `bld-${lease.id}`, leaseId: lease.id, demo: lease.demo },
+      ),
+    );
   }
   r.status = "paid";
   s.transactions.push({
@@ -402,7 +385,7 @@ export function fulfill(
     reservationId: r.id,
     amount: r.amount,
     email: r.email,
-    createdAt: new Date(now).toISOString(),
+    createdAt: at,
     provider,
   });
   s.activity.push({
@@ -414,7 +397,7 @@ export function fulfill(
       : r.renewalLeaseId
         ? "renewed"
         : "claimed",
-    createdAt: new Date(now).toISOString(),
+    createdAt: at,
     demo: provider === "demo",
   });
   metric(s, "checkout_completed", r.propertyId, now);
@@ -432,11 +415,9 @@ export function fulfill(
     s,
     r.email,
     r.upgradeLeaseId
-      ? "Your SkyCity presence is upgraded"
-      : r.renewalLeaseId
-        ? "Your SkyCity building is renewed"
-        : "Welcome to SkyCity",
-    `${lease.ad.brand} · ${r.propertyId} · ${lease.presenceTier}. ${r.upgradeLeaseId ? `Upgrade ${r.fromTier} → ${r.presenceTier}: €${r.amount}.` : "Placement confirmed."} Your lease ends ${lease.expiresAt}. Open My Buildings to request a secure access link.`,
+      ? "Tu edificio de SkyCity ha crecido"
+      : "Bienvenido a SkyCity",
+    `${lease.ad.brand} · ${p.name} · ${lease.presenceTier}. ${r.upgradeLeaseId ? `Mejora ${r.fromTier} → ${r.presenceTier}: ${r.amount} €.` : "Tu edificio ya está construido."} Pago único, sin renovaciones. Entra en Mis edificios para pedir un enlace de acceso seguro.`,
     `confirmation:${r.id}`,
   );
   const auction = s.auctions.find((a) => a.reservationId === r.id);
@@ -453,7 +434,7 @@ export function placeBid(
 ) {
   const a = s.auctions.find((a) => a.id === auctionId && a.status === "live");
   if (!a || Date.parse(a.endsAt) <= now)
-    throw new DomainError("This auction has ended.", 409);
+    throw new DomainError("Esta subasta ha terminado.", 409);
   const prev = s.bids
     .filter((b) => b.auctionId === a.id)
     .sort((a, b) => b.amount - a.amount)[0];
@@ -464,7 +445,7 @@ export function placeBid(
     amount > 100000 ||
     Math.round(amount * 100) !== amount * 100
   )
-    throw new DomainError(`The next bid must be at least €${min}.`);
+    throw new DomainError(`La siguiente puja debe ser de al menos ${min} €.`);
   s.bids.push({
     id: randomUUID(),
     auctionId: a.id,
@@ -475,7 +456,7 @@ export function placeBid(
   s.activity.push({
     id: randomUUID(),
     propertyId: a.propertyId,
-    brand: "A city explorer",
+    brand: "Un explorador de la ciudad",
     action: "bid",
     amount,
     createdAt: new Date(now).toISOString(),
@@ -486,8 +467,8 @@ export function placeBid(
     queueMail(
       s,
       prev.email,
-      "You have been outbid in SkyCity",
-      `The new bid for ${a.propertyId} is €${amount}.`,
+      "Han superado tu puja en SkyCity",
+      `La nueva puja por ${a.propertyId} es de ${amount} €.`,
     );
 }
 export function closeAuctions(
@@ -510,8 +491,8 @@ export function closeAuctions(
         id: randomUUID(),
         propertyId: a.propertyId,
         email: winner.email,
-        ad: { ...emptyAd, brand: "New city resident" },
-        days: a.days,
+        ad: { ...emptyAd, brand: "Nuevo vecino" },
+        days: 0,
         amount: winner.amount,
         presenceTier: "LANDMARK",
         expiresAt: new Date(now + 24 * 3600000).toISOString(),
@@ -527,8 +508,8 @@ export function closeAuctions(
         queueMail(
           s,
           winner.email,
-          "You won a SkyCity auction",
-          `Complete your payment within 24 hours: ${baseUrl}/auction-payment?reservation=${r.id}&access=${secret}`,
+          "Has ganado una subasta en SkyCity",
+          `Completa el pago en las próximas 24 horas: ${baseUrl}/auction-payment?reservation=${r.id}&access=${secret}`,
           `winner:${a.id}`,
         );
     }

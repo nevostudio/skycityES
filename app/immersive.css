@@ -120,6 +120,9 @@
 .immersive-app .status-dot.reserved {
   background: #c9ae63;
 }
+.immersive-app .status-dot.public {
+  background: #5f8fae;
+}
 .world-intro {
   position: absolute;
   left: 42px;

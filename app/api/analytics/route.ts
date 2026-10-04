@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     );
     const { event, propertyId = "" } = await req.json();
     if (!allowed.includes(event))
-      return Response.json({ error: "Invalid event" }, { status: 400 });
+      return Response.json({ error: "Evento no válido" }, { status: 400 });
     const jar = await cookies();
     const key = `sc_${event}_${String(propertyId).replace(/[^a-z0-9-]/gi, "")}`;
     if (jar.has(key)) return Response.json({ ok: true });

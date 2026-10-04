@@ -12,6 +12,7 @@ import type {
   Property,
   District,
   Lease,
+  Building,
   Auction,
   Bid,
   Transaction,
@@ -22,11 +23,30 @@ import type {
 import { Header } from "../header";
 import { Login } from "../dashboard/login";
 import { PropertyEditor } from "./property-editor";
-import { api, euro } from "@/lib/client";
+import { api, euro, shortDate } from "@/lib/client";
+const tabs = [
+  "Solares",
+  "Barrios",
+  "Edificios y anuncios",
+  "Subastas",
+  "Pujas",
+  "Clientes",
+  "Transacciones",
+  "Correos",
+  "Ajustes",
+];
+const adStatus: Record<string, string> = {
+  active: "activo",
+  pending: "en revisión",
+  draft: "borrador",
+  rejected: "rechazado",
+  suspended: "suspendido",
+};
 type AdminData = {
   properties: Property[];
   districts: District[];
   leases: Lease[];
+  buildings: Building[];
   auctions: Auction[];
   bids: Bid[];
   transactions: Transaction[];
@@ -41,7 +61,7 @@ export function Admin({ demo }: { demo: boolean }) {
   const [data, setData] = useState<AdminData | null>(null);
   const [auth, setAuth] = useState("loading");
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("Properties");
+  const [tab, setTab] = useState("Solares");
   const [query, setQuery] = useState("");
   const [edit, setEdit] = useState<Property | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,7 +88,7 @@ export function Admin({ demo }: { demo: boolean }) {
     try {
       await api("/api/admin", body);
       await load();
-      setMessage("Changes saved.");
+      setMessage("Cambios guardados.");
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -81,7 +101,7 @@ export function Admin({ demo }: { demo: boolean }) {
     setEdit({
       id: "",
       number: 0,
-      name: "New building",
+      name: "Nuevo solar",
       districtId: data!.districts[0].id,
       type: "shop",
       tier: "STANDARD",
@@ -91,11 +111,11 @@ export function Admin({ demo }: { demo: boolean }) {
       z: 42,
       width: 3,
       depth: 3,
-      height: 3,
+      height: 0.3,
       rotation: 0,
       model: 0,
       color: "#d5c3a7",
-      prices: Object.fromEntries([30].map((d) => [String(d), 3])),
+      price: 3,
       sale: "rental",
       featured: false,
       enabled: true,
@@ -106,12 +126,12 @@ export function Admin({ demo }: { demo: boolean }) {
       <main className="page-shell">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">BEHIND THE NEIGHBORHOOD</span>
-            <h1>City Hall.</h1>
-            <p>Shape the city. Make room for what comes next.</p>
+            <span className="eyebrow">DETRÁS DEL BARRIO</span>
+            <h1>Ayuntamiento.</h1>
+            <p>Da forma a la ciudad. Haz sitio a lo que viene.</p>
           </div>
           <Link href="/" className="button outline">
-            Explore SkyCity
+            Explorar SkyCity
             <ArrowUpRight size={15} />
           </Link>
         </div>
@@ -119,29 +139,29 @@ export function Admin({ demo }: { demo: boolean }) {
           <Login demo={demo} admin />
         ) : auth === "forbidden" ? (
           <div className="error">
-            This email does not have administrator access.{" "}
-            <Link href="/my-buildings">Switch account in My Buildings.</Link>
+            Este email no tiene acceso de administrador.{" "}
+            <Link href="/my-buildings">Cambia de cuenta en Mis edificios.</Link>
           </div>
         ) : !data ? (
-          <p className="muted">Opening City Hall…</p>
+          <p className="muted">Abriendo el Ayuntamiento…</p>
         ) : (
           <>
             {demo && (
               <div className="inline-notice">
-                DEMO ADMIN · Changes persist in this local city. No real
-                payments or emails are sent.
+                ADMIN DEMO · Los cambios se guardan en esta ciudad local. No se
+                envían pagos ni correos reales.
               </div>
             )}
             <div className="admin-stats">
               {[
-                ["Revenue", euro(data.revenue)],
-                ["Active leases", data.stats.claimed],
-                ["Occupancy", `${data.stats.occupancy}%`],
-                ["Available spots", data.stats.available],
-                ["Claims today", data.stats.claimsToday],
-                ["Advertisers", data.stats.advertisers],
-                ["Live auctions", data.stats.auctions],
-                ["External clicks", data.clicks],
+                ["Ingresos", euro(data.revenue)],
+                ["Edificios construidos", data.stats.built],
+                ["Porcentaje construido", `${data.stats.builtPercent}%`],
+                ["Solares disponibles", data.stats.available],
+                ["Construidos hoy", data.stats.builtToday],
+                ["Propietarios", data.stats.owners],
+                ["Subastas activas", data.stats.auctions],
+                ["Clics externos", data.clicks],
               ].map(([label, value]) => (
                 <div key={label}>
                   <small>{label}</small>
@@ -150,17 +170,7 @@ export function Admin({ demo }: { demo: boolean }) {
               ))}
             </div>
             <div className="admin-tabs">
-              {[
-                "Properties",
-                "Districts",
-                "Leases & ads",
-                "Auctions",
-                "Bids",
-                "Customers",
-                "Transactions",
-                "Email outbox",
-                "Settings",
-              ].map((t) => (
+              {tabs.map((t) => (
                 <button
                   key={t}
                   className={t === tab ? "active" : ""}
@@ -178,29 +188,29 @@ export function Admin({ demo }: { demo: boolean }) {
                 {message}
               </div>
             )}
-            {tab === "Properties" && (
+            {tab === "Solares" && (
               <>
                 <div className="admin-toolbar">
                   <input
-                    aria-label="Search properties"
-                    placeholder="Find a building…"
+                    aria-label="Buscar solares"
+                    placeholder="Busca un solar…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <button className="button dark" onClick={newProperty}>
                     <Plus size={15} />
-                    Add property
+                    Añadir solar
                   </button>
                 </div>
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>PROPERTY</th>
-                        <th>DISTRICT</th>
-                        <th>30 DAYS</th>
-                        <th>TIER</th>
-                        <th>STATUS</th>
+                        <th>SOLAR</th>
+                        <th>BARRIO</th>
+                        <th>PRECIO</th>
+                        <th>EDIFICIO</th>
+                        <th>ESTADO</th>
                         <th />
                       </tr>
                     </thead>
@@ -225,21 +235,29 @@ export function Admin({ demo }: { demo: boolean }) {
                               }
                             </td>
                             <td>
-                              {euro(
-                                p.prices["30"] || Object.values(p.prices)[0],
-                              )}
+                              {p.inventory === "public"
+                                ? "—"
+                                : p.inventory === "skyscraper"
+                                  ? euro(p.price)
+                                  : "3–60 €"}
                             </td>
                             <td>
-                              {p.inventory === "skyscraper"
-                                ? "SKYSCRAPER"
-                                : "€3–€60"}
+                              {data.buildings.find((b) => b.propertyId === p.id)
+                                ?.tier ||
+                                (p.inventory === "skyscraper"
+                                  ? "Parcela premium"
+                                  : "Solar vacío")}
                             </td>
                             <td>
                               {p.enabled
-                                ? p.reservedForBrands
-                                  ? "Reserved for brands"
-                                  : p.sale
-                                : "Inactive"}
+                                ? p.inventory === "public"
+                                  ? "Público"
+                                  : p.reservedForBrands
+                                    ? "Reservado para marcas"
+                                    : p.sale === "auction"
+                                      ? "Subasta"
+                                      : "Venta directa"
+                                : "Inactivo"}
                             </td>
                             <td>
                               <button
@@ -247,7 +265,7 @@ export function Admin({ demo }: { demo: boolean }) {
                                 onClick={() => setEdit(p)}
                               >
                                 <Pencil size={13} />
-                                Edit
+                                Editar
                               </button>
                             </td>
                           </tr>
@@ -257,7 +275,7 @@ export function Admin({ demo }: { demo: boolean }) {
                 </div>
               </>
             )}
-            {tab === "Districts" && (
+            {tab === "Barrios" && (
               <div className="admin-records">
                 {data.districts.map((d) => (
                   <form
@@ -278,11 +296,11 @@ export function Admin({ demo }: { demo: boolean }) {
                     }}
                   >
                     <label>
-                      Name
+                      Nombre
                       <input name="name" defaultValue={d.name} required />
                     </label>
                     <label>
-                      Subtitle
+                      Subtítulo
                       <input name="subtitle" defaultValue={d.subtitle} />
                     </label>
                     <label>
@@ -290,58 +308,64 @@ export function Admin({ demo }: { demo: boolean }) {
                       <input type="color" name="color" defaultValue={d.color} />
                     </label>
                     <button className="button outline" disabled={busy}>
-                      Save district
+                      Guardar barrio
                     </button>
                   </form>
                 ))}
               </div>
             )}
-            {tab === "Leases & ads" && (
+            {tab === "Edificios y anuncios" && (
               <div className="admin-records">
-                {data.leases.map((l) => (
-                  <div className="admin-record" key={l.id}>
-                    <div>
-                      <strong>{l.ad.brand}</strong> · {l.propertyId}
-                      <small>
-                        {l.email} · until{" "}
-                        {new Date(l.expiresAt).toLocaleDateString("en-GB")} ·{" "}
-                        {l.status}
-                      </small>
+                {data.leases
+                  .filter((l) => !l.retired)
+                  .map((l) => (
+                    <div className="admin-record" key={l.id}>
+                      <div>
+                        <strong>{l.ad.brand}</strong> · {l.propertyId}
+                        <small>
+                          {l.email} · edificio{" "}
+                          {data.buildings.find((b) => b.leaseId === l.id)
+                            ?.tier || l.presenceTier}{" "}
+                          · desde {shortDate(l.startsAt)} ·{" "}
+                          {l.status === "active" ? "en pie" : "inactivo"}
+                        </small>
+                      </div>
+                      <span className="tag">{adStatus[l.ad.status]}</span>
+                      <button
+                        className="button outline"
+                        disabled={busy}
+                        onClick={() =>
+                          action({
+                            action: "moderate",
+                            leaseId: l.id,
+                            status:
+                              l.ad.status === "active" ? "suspended" : "active",
+                          })
+                        }
+                      >
+                        <ShieldCheck size={14} />
+                        {l.ad.status === "active"
+                          ? "Suspender anuncio"
+                          : "Activar anuncio"}
+                      </button>
+                      <button
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() =>
+                          action({
+                            action: "moderate",
+                            leaseId: l.id,
+                            status: "rejected",
+                          })
+                        }
+                      >
+                        Rechazar
+                      </button>
                     </div>
-                    <span className="tag">{l.ad.status}</span>
-                    <button
-                      className="button outline"
-                      disabled={busy}
-                      onClick={() =>
-                        action({
-                          action: "moderate",
-                          leaseId: l.id,
-                          status:
-                            l.ad.status === "active" ? "suspended" : "active",
-                        })
-                      }
-                    >
-                      <ShieldCheck size={14} />
-                      {l.ad.status === "active" ? "Suspend ad" : "Activate ad"}
-                    </button>
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() =>
-                        action({
-                          action: "moderate",
-                          leaseId: l.id,
-                          status: "rejected",
-                        })
-                      }
-                    >
-                      Reject
-                    </button>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
-            {tab === "Auctions" && (
+            {tab === "Subastas" && (
               <>
                 <div className="admin-records">
                   {data.auctions.map((a) => (
@@ -354,8 +378,8 @@ export function Admin({ demo }: { demo: boolean }) {
                           }
                         </strong>
                         <small>
-                          Ends {new Date(a.endsAt).toLocaleString("en-GB")} ·{" "}
-                          {a.days} days · starting {euro(a.startingBid)}
+                          Termina {new Date(a.endsAt).toLocaleString("es-ES")} ·
+                          salida {euro(a.startingBid)}
                         </small>
                       </div>
                       <span className="tag">{a.status}</span>
@@ -371,18 +395,21 @@ export function Admin({ demo }: { demo: boolean }) {
                       action: "auction",
                       propertyId: f.get("propertyId"),
                       hours: Number(f.get("hours")),
-                      days: Number(f.get("days")),
                       startingBid: Number(f.get("startingBid")),
                       increment: Number(f.get("increment")),
                     });
                   }}
                 >
-                  <h2>Open an auction.</h2>
+                  <h2>Abrir una subasta.</h2>
                   <label>
-                    Property
+                    Rascacielos
                     <select name="propertyId">
                       {data.properties
-                        .filter((p) => p.inventory === "skyscraper")
+                        .filter(
+                          (p) =>
+                            p.inventory === "skyscraper" &&
+                            !data.buildings.some((b) => b.propertyId === p.id),
+                        )
                         .map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
@@ -392,7 +419,7 @@ export function Admin({ demo }: { demo: boolean }) {
                   </label>
                   <div className="form-row">
                     <label>
-                      Starting bid (€)
+                      Puja de salida (€)
                       <input
                         name="startingBid"
                         type="number"
@@ -401,7 +428,7 @@ export function Admin({ demo }: { demo: boolean }) {
                       />
                     </label>
                     <label>
-                      Bid increment (€)
+                      Incremento de puja (€)
                       <input
                         name="increment"
                         type="number"
@@ -410,35 +437,23 @@ export function Admin({ demo }: { demo: boolean }) {
                       />
                     </label>
                   </div>
-                  <div className="form-row">
-                    <label>
-                      Auction hours
-                      <input
-                        name="hours"
-                        type="number"
-                        min="1"
-                        max="720"
-                        defaultValue="48"
-                      />
-                    </label>
-                    <label>
-                      Lease days
-                      <input
-                        name="days"
-                        type="number"
-                        min="1"
-                        max="365"
-                        defaultValue="30"
-                      />
-                    </label>
-                  </div>
+                  <label>
+                    Duración de la subasta (horas)
+                    <input
+                      name="hours"
+                      type="number"
+                      min="1"
+                      max="720"
+                      defaultValue="48"
+                    />
+                  </label>
                   <button disabled={busy} className="button dark wide">
-                    Create auction
+                    Crear subasta
                   </button>
                 </form>
               </>
             )}
-            {tab === "Bids" && (
+            {tab === "Pujas" && (
               <div className="admin-records">
                 {data.bids.map((b) => (
                   <div className="admin-record" key={b.id}>
@@ -446,36 +461,42 @@ export function Admin({ demo }: { demo: boolean }) {
                       {b.email}
                       <small>
                         {b.auctionId} ·{" "}
-                        {new Date(b.createdAt).toLocaleString("en-GB")}
+                        {new Date(b.createdAt).toLocaleString("es-ES")}
                       </small>
                     </div>
                     <strong>{euro(b.amount)}</strong>
                   </div>
                 ))}
-                {!data.bids.length && <p className="muted">No bids yet.</p>}
+                {!data.bids.length && (
+                  <p className="muted">Todavía no hay pujas.</p>
+                )}
               </div>
             )}
-            {tab === "Customers" && (
+            {tab === "Clientes" && (
               <div className="admin-records">
                 {data.customers.map((email) => (
                   <div className="admin-record" key={email}>
                     <strong>{email}</strong>
                     <span>
-                      {data.leases.filter((l) => l.email === email).length}{" "}
-                      leases
+                      {
+                        data.leases.filter(
+                          (l) => l.email === email && l.status === "active",
+                        ).length
+                      }{" "}
+                      edificios
                     </span>
                   </div>
                 ))}
               </div>
             )}
-            {tab === "Transactions" && (
+            {tab === "Transacciones" && (
               <div className="admin-records">
                 {data.transactions.map((t) => (
                   <div className="admin-record" key={t.id}>
                     <div>
                       <strong>{t.email}</strong>
                       <small>
-                        {new Date(t.createdAt).toLocaleString("en-GB")} ·{" "}
+                        {new Date(t.createdAt).toLocaleString("es-ES")} ·{" "}
                         {t.provider} · {t.id}
                       </small>
                     </div>
@@ -484,30 +505,31 @@ export function Admin({ demo }: { demo: boolean }) {
                 ))}
                 {!data.transactions.length && (
                   <p className="muted">
-                    Transactions appear after a completed checkout.
+                    Las transacciones aparecen tras un pago completado.
                   </p>
                 )}
               </div>
             )}
-            {tab === "Email outbox" && (
+            {tab === "Correos" && (
               <div className="admin-records">
                 {data.mail.map((m) => (
                   <div className="admin-record" key={m.id}>
                     <div>
                       <strong>{m.subject}</strong>
                       <small>
-                        To {m.email} · {m.status}
+                        Para {m.email} ·{" "}
+                        {m.status === "sent" ? "enviado" : "pendiente"}
                       </small>
                       <p className="muted">{m.text}</p>
                     </div>
                   </div>
                 ))}
                 {!data.mail.length && (
-                  <p className="muted">No queued emails.</p>
+                  <p className="muted">No hay correos en cola.</p>
                 )}
               </div>
             )}
-            {tab === "Settings" && (
+            {tab === "Ajustes" && (
               <form
                 className="auth-card"
                 onSubmit={async (e) => {
@@ -516,29 +538,20 @@ export function Admin({ demo }: { demo: boolean }) {
                   await action({
                     action: "settings",
                     settings: {
-                      durations: String(f.get("durations"))
-                        .split(",")
-                        .map(Number),
                       reservationMinutes: Number(f.get("reservationMinutes")),
                       moderation: f.get("moderation"),
                     },
                   });
                 }}
               >
-                <h2>City settings.</h2>
+                <h2>Ajustes de la ciudad.</h2>
+                <p className="field-hint">
+                  Edificios de pago único: STARTER 3 € · PLUS 7 € · PRO 15 € ·
+                  PREMIUM 30 € · LANDMARK 60 €. Los rascacielos son inventario
+                  premium.
+                </p>
                 <label>
-                  Lease durations (days, comma separated)
-                  <input
-                    name="durations"
-                    defaultValue={data.settings.durations.join(", ")}
-                  />
-                  <small className="field-hint">
-                    Normal properties use 30-day presence tiers. Other durations
-                    apply to skyscrapers only.
-                  </small>
-                </label>
-                <label>
-                  Demo reservation minutes
+                  Minutos de reserva en demo
                   <input
                     type="number"
                     name="reservationMinutes"
@@ -547,24 +560,21 @@ export function Admin({ demo }: { demo: boolean }) {
                     defaultValue={data.settings.reservationMinutes}
                   />
                   <small className="field-hint">
-                    Stripe Checkout uses 30 minutes, its minimum expiration
-                    window.
+                    Stripe Checkout usa 30 minutos, su caducidad mínima.
                   </small>
                 </label>
                 <label>
-                  Advertisement moderation
+                  Moderación de anuncios
                   <select
                     name="moderation"
                     defaultValue={data.settings.moderation}
                   >
-                    <option value="automatic">Activate, then moderate</option>
-                    <option value="review">
-                      Require review before display
-                    </option>
+                    <option value="automatic">Activar y moderar después</option>
+                    <option value="review">Revisar antes de mostrar</option>
                   </select>
                 </label>
                 <button disabled={busy} className="button dark wide">
-                  Save settings
+                  Guardar ajustes
                 </button>
                 <button
                   type="button"
@@ -574,7 +584,7 @@ export function Admin({ demo }: { demo: boolean }) {
                   onClick={() => action({ action: "maintenance" })}
                 >
                   <RefreshCw size={14} />
-                  Process expirations & auctions
+                  Procesar reservas caducadas y subastas
                 </button>
               </form>
             )}

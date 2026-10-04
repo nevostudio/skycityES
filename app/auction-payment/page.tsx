@@ -6,11 +6,11 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   return (
     <main className="auth-card">
-      <span className="eyebrow">YOUR WINNING ADDRESS</span>
-      <h1>Make it official.</h1>
+      <span className="eyebrow">TU PARCELA GANADORA</span>
+      <h1>Hazlo oficial.</h1>
       <p>
-        Complete your winning auction payment to activate your building. You can
-        customize your brand in My Buildings after payment.
+        Completa el pago de tu subasta para construir tu rascacielos. Podrás
+        personalizar tu marca en Mis edificios después del pago.
       </p>
       {error && <p className="error">{error}</p>}
       <button
@@ -31,7 +31,7 @@ export default function Page() {
           }
         }}
       >
-        Continue to secure payment →
+        Continuar al pago seguro →
       </button>
     </main>
   );

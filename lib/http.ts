@@ -8,19 +8,19 @@ export function checkOrigin(req: Request) {
     origin !== new URL(req.url).origin &&
     origin !== new URL(appUrl()).origin
   )
-    throw new DomainError("Invalid request origin.", 403);
+    throw new DomainError("Origen de la petición no válido.", 403);
 }
 export function fail(error: unknown) {
   if (error instanceof ZodError)
     return Response.json(
-      { error: error.issues[0]?.message || "Invalid input" },
+      { error: error.issues[0]?.message || "Datos no válidos" },
       { status: 400 },
     );
   if (error instanceof DomainError)
     return Response.json({ error: error.message }, { status: error.status });
   console.error(error);
   return Response.json(
-    { error: "The request could not be completed. Please try again." },
+    { error: "No se ha podido completar la petición. Inténtalo de nuevo." },
     { status: 500 },
   );
 }
@@ -32,5 +32,8 @@ export function rateLimit(key: string, limit = 30) {
   const b = buckets.get(key);
   if (!b || b.until < now) buckets.set(key, { count: 1, until: now + 60000 });
   else if (++b.count > limit)
-    throw new DomainError("Please wait a moment before trying again.", 429);
+    throw new DomainError(
+      "Espera un momento antes de volver a intentarlo.",
+      429,
+    );
 }

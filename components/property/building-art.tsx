@@ -1,4 +1,4 @@
-import type { Property } from "@/types";
+import type { Property, PublicProperty } from "@/types";
 export function BuildingArt({
   property,
   brand,
@@ -17,7 +17,7 @@ export function BuildingArt({
       className={`building-art ${className}`}
       viewBox="0 0 240 180"
       role="img"
-      aria-label={`${property.type} ${property.number} architectural illustration`}
+      aria-label={`Ilustración del edificio #${property.number}`}
     >
       <ellipse cx="123" cy="150" rx="73" ry="15" fill="#24463b" opacity=".09" />
       <path d="M29 139 119 94 212 139 122 177Z" fill="#b9c6ae" />
@@ -66,5 +66,93 @@ export function BuildingArt({
         </g>
       )}
     </svg>
+  );
+}
+/** An empty, buildable plot: curb, soil, survey stakes and a "+". */
+export function PlotArt({
+  premium = false,
+  reserved = false,
+  className = "",
+}: {
+  premium?: boolean;
+  reserved?: boolean;
+  className?: string;
+}) {
+  const stake = reserved ? "#e2bb4f" : "#e28a4f";
+  return (
+    <svg
+      className={`building-art plot-art ${className}`}
+      viewBox="0 0 240 180"
+      role="img"
+      aria-label={premium ? "Parcela premium en obras" : "Solar vacío"}
+    >
+      <ellipse cx="121" cy="146" rx="86" ry="18" fill="#24463b" opacity=".08" />
+      <path d="M22 118 120 70 220 118 122 166Z" fill="#b9c6ae" />
+      <path d="M44 117 120 80 198 117 122 154Z" fill="#e6e1d2" />
+      <path d="m44 117 78 37v6l-78-37Z" fill="#cfc9b8" />
+      <path d="m122 154 76-37v6l-76 37Z" fill="#d9d3c2" />
+      <path d="M58 116 120 87 184 116 122 146Z" fill="#c9b48c" />
+      {[
+        [58, 116],
+        [120, 87],
+        [184, 116],
+        [122, 146],
+      ].map(([x, y]) => (
+        <path
+          key={`${x}${y}`}
+          d={`M${x} ${y}v-17`}
+          stroke={stake}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      ))}
+      {premium ? (
+        <>
+          <path d="M98 104h6v-62h-6Z" fill="#e2b54b" />
+          <path d="M70 44h92v5H70Z" fill="#e2b54b" />
+          <path d="M148 49v26" stroke="#5f625c" strokeWidth="1.5" />
+          <path d="M144 75h8v6h-8Z" fill="#d9813f" />
+          <path d="M108 112h28v-20h-28Z" fill="#d6d2c6" />
+        </>
+      ) : reserved ? (
+        <path
+          d="m86 117 70-2m-36-16 2 34"
+          stroke="#a6a499"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path
+          d="m104 116 34 0m-17-12 0 24"
+          stroke="#6f9a6a"
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+      )}
+      <circle cx="40" cy="104" r="11" fill="#7d9c6a" />
+      <path d="M40 117v-6" stroke="#847664" strokeWidth="3" />
+      <circle cx="204" cy="102" r="13" fill="#8eaa79" />
+      <path d="M204 117v-6" stroke="#847664" strokeWidth="3" />
+    </svg>
+  );
+}
+/** Plot illustration while empty, building illustration once something stands on it. */
+export function PropertyArt({
+  property: p,
+  brand,
+  className = "",
+}: {
+  property: PublicProperty;
+  brand?: string;
+  className?: string;
+}) {
+  return p.building ? (
+    <BuildingArt property={p} brand={brand} className={className} />
+  ) : (
+    <PlotArt
+      premium={p.inventory === "skyscraper"}
+      reserved={p.status === "reserved" && p.inventory !== "skyscraper"}
+      className={className}
+    />
   );
 }

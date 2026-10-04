@@ -17,26 +17,51 @@ import {
   MapPin,
 } from "lucide-react";
 import Link from "next/link";
-import type { CityData, PublicProperty } from "@/types";
+import type { BuildingTier, CityData, Lease, PublicProperty } from "@/types";
 import { useCity } from "@/hooks/use-city";
 import { Header } from "../header";
 import { DistrictSidebar } from "./district-sidebar";
 import CityScene from "./city-loader";
+import type { Construction } from "./building";
 import { PropertyPanel } from "../property/property-panel";
 import { ClaimModal } from "../checkout/claim-modal";
 import { ShareModal } from "../property/share-modal";
-import { euro, offerPrice, offerDays } from "@/lib/client";
+import { api, districtName, euro, statusLabel } from "@/lib/client";
+import { buildingHeight } from "@/lib/presence";
 import { track } from "@/lib/analytics/client";
 const filters = [
-  "All buildings",
-  "Available",
-  "Claimed",
-  "Auction",
-  "Under €5",
-  "Under €10",
+  "Todos",
+  "Disponibles",
+  "Construidos",
+  "Subastas",
+  "Públicos",
   "Premium",
-  "Featured",
+  "Destacados",
 ];
+const quickFilters: Record<string, string> = {
+  Todos: "Todo",
+  Disponibles: "Solares libres",
+  Construidos: "Construidos",
+  Subastas: "Subastas",
+};
+const dotClass: Record<string, string> = {
+  Disponibles: "available",
+  Construidos: "claimed",
+  Subastas: "auction",
+};
+const activityLabel: Record<string, string> = {
+  claimed: "ha construido en",
+  upgraded: "ha hecho crecer",
+  renewed: "ha renovado",
+  bid: "ha pujado por",
+};
+type Owned = Pick<Lease, "id" | "propertyId" | "email" | "ad" | "presenceTier">;
+function reducedMotion() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
 export function Explorer({
   initial,
   initialProperty,
@@ -46,12 +71,13 @@ export function Explorer({
 }) {
   const { data, refresh, error } = useCity(initial);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All buildings");
+  const [filter, setFilter] = useState("Todos");
   const [district, setDistrict] = useState("all");
   const [selected, setSelected] = useState<string | null>(
     initialProperty || null,
   );
   const [claim, setClaim] = useState(false);
+  const [upgrade, setUpgrade] = useState<Owned | null>(null);
   const [share, setShare] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [zoom, setZoom] = useState(0);
@@ -60,15 +86,75 @@ export function Explorer({
   const [sidebar, setSidebar] = useState(false);
   const [introHidden, setIntroHidden] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [owned, setOwned] = useState<Owned[]>([]);
+  const [constructing, setConstructing] = useState<
+    Record<string, Construction>
+  >({});
+  const shareAfterBuild = useRef<string | null>(null);
+  const previous = useRef<Map<string, BuildingTier | undefined> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const loadOwned = useCallback(async () => {
+    try {
+      const me = await api<{ leases?: Owned[] }>("/api/me");
+      setOwned(me.leases || []);
+    } catch {
+      setOwned([]);
+    }
+  }, []);
+  /** Plot → foundations → structure → growth → building, for every new or grown building. */
+  const build = useCallback((p: PublicProperty, from?: BuildingTier) => {
+    if (reducedMotion() || !p.building) return false;
+    const ratio =
+      from && from !== p.building.tier
+        ? Math.min(0.95, buildingHeight(from, p.model) / p.height)
+        : 0;
+    setConstructing((c) => ({
+      ...c,
+      [p.id]: { from: ratio, start: performance.now() },
+    }));
+    return true;
+  }, []);
+  const built = useCallback((id: string) => {
+    setConstructing((c) => {
+      const next = { ...c };
+      delete next[id];
+      return next;
+    });
+    if (shareAfterBuild.current === id) {
+      shareAfterBuild.current = null;
+      setCelebrate(true);
+      setShare(true);
+    }
+  }, []);
   useEffect(() => {
+    // The city grows live: animate any building that appeared or grew since the last refresh.
+    const now = new Map(data.properties.map((p) => [p.id, p.building?.tier]));
+    const before = previous.current;
+    previous.current = now;
+    if (!before) {
+      const q = new URLSearchParams(location.search);
+      for (const p of data.properties)
+        if (
+          p.building &&
+          (p.building.state === "CONSTRUCTING" ||
+            (q.has("obra") && q.get("building") === p.id))
+        )
+          build(p, p.building.upgradedAt ? p.building.previousTier : undefined);
+      return;
+    }
+    for (const p of data.properties)
+      if (p.building && before.get(p.id) !== p.building.tier)
+        build(p, before.get(p.id));
+  }, [data.properties, build]);
+  useEffect(() => {
+    void loadOwned();
     const q = new URLSearchParams(location.search);
     if (q.get("building")) {
       setSelected(q.get("building"));
       setIntroHidden(true);
     }
     if (q.has("available")) {
-      setFilter("Available");
+      setFilter("Disponibles");
       setList(true);
       setIntroHidden(true);
     }
@@ -95,32 +181,28 @@ export function Explorer({
     }
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, []);
+  }, [loadOwned]);
   const matching = data.properties.filter(
     (p) =>
       (district === "all" || p.districtId === district) &&
-      `${p.name} ${p.number} ${p.districtId.replaceAll("-", " ")} ${p.ad?.brand || ""}`
+      `${p.name} ${p.number} ${districtName(p.districtId, data.districts)} ${p.ad?.brand || ""}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
-      (filter === "All buildings" ||
-        (filter === "Available" && p.status === "available") ||
-        (filter === "Claimed" && p.status === "claimed") ||
-        (filter === "Auction" && p.status === "auction") ||
-        (filter === "Under €5" &&
-          p.status === "available" &&
-          offerPrice(p) <= 5) ||
-        (filter === "Under €10" &&
-          p.status === "available" &&
-          offerPrice(p) <= 10) ||
+      (filter === "Todos" ||
+        (filter === "Disponibles" && p.status === "available") ||
+        (filter === "Construidos" && !!p.building) ||
+        (filter === "Subastas" && p.status === "auction") ||
+        (filter === "Públicos" && p.status === "public") ||
         (filter === "Premium" &&
           (p.inventory === "skyscraper" ||
-            ["PREMIUM", "LANDMARK"].includes(p.presenceTier || ""))) ||
-        (filter === "Featured" && p.featured)),
+            ["PREMIUM", "LANDMARK"].includes(p.building?.tier || ""))) ||
+        (filter === "Destacados" && p.featured)),
   );
   const p = data.properties.find((p) => p.id === selected);
+  const mine = p && owned.find((l) => l.propertyId === p.id);
   const cheapest = data.properties
     .filter((p) => p.status === "available")
-    .sort((a, b) => offerPrice(a) - offerPrice(b))[0];
+    .sort((a, b) => a.price - b.price)[0];
   const focused = data.districts.find((d) => d.id === district) || null;
   const choose = useCallback((p: PublicProperty) => {
     setSelected(p.id);
@@ -134,12 +216,25 @@ export function Explorer({
   function findSpot() {
     const next =
       matching
-        .filter((p) => p.status === "available")
-        .sort((a, b) => offerPrice(a) - offerPrice(b))[0] || cheapest;
+        .filter((p) => p.status === "available" && p.inventory === "normal")
+        .sort((a, b) => a.price - b.price)[0] || cheapest;
     if (next) choose(next);
     else {
       setList(true);
-      setFilter("All buildings");
+      setFilter("Todos");
+    }
+  }
+  async function completed(id: string) {
+    const next = await refresh();
+    await loadOwned();
+    setClaim(false);
+    setUpgrade(null);
+    const after = next?.properties.find((v) => v.id === id);
+    // Share once the building has finished rising (or right away without motion).
+    if (after?.building && !reducedMotion()) shareAfterBuild.current = id;
+    else {
+      setCelebrate(true);
+      setShare(true);
     }
   }
   const showIntro = !introHidden && !p && !query && !list;
@@ -149,7 +244,7 @@ export function Explorer({
       <main className="city-experience">
         <section
           className="map-shell"
-          aria-label="Explore the SkyCity interactive map"
+          aria-label="Explora el mapa interactivo de SkyCity"
         >
           <div className="map-canvas">
             <CityScene
@@ -161,36 +256,40 @@ export function Explorer({
               focus={focused}
               zoomAction={zoom}
               resetKey={reset}
+              constructing={constructing}
+              onBuilt={built}
             />
           </div>
           {showIntro && (
             <section className="world-intro">
               <button
                 className="intro-dismiss icon-button"
-                aria-label="Hide introduction"
+                aria-label="Ocultar introducción"
                 onClick={() => setIntroHidden(true)}
               >
                 <X size={15} />
               </button>
               <div className="intro-kicker">
                 <span />
-                AN OPEN CITY FOR BIG IDEAS
+                UNA CIUDAD POR CONSTRUIR
               </div>
               <h1>
-                Put your brand
+                Construye tu marca
                 <br />
-                on the map<span>.</span>
+                en el mapa<span>.</span>
               </h1>
-              <p>Claim your place in SkyCity from €3.</p>
+              <p>
+                Elige un solar y levanta tu edificio desde{" "}
+                {euro(cheapest?.price ?? 3)}.
+              </p>
               <button className="intro-claim" onClick={findSpot}>
-                Find my spot <ArrowUpRight size={16} />
+                Elegir mi solar <ArrowUpRight size={16} />
               </button>
-              {cheapest && (
-                <small>
-                  From {euro(offerPrice(cheapest))} / {offerDays(cheapest)}{" "}
-                  days. No account needed.
-                </small>
-              )}
+              <small>
+                {data.stats.built} edificios construidos ·{" "}
+                {data.stats.available} solares libres · Pago único, sin
+                registro.
+              </small>
             </section>
           )}
           <div className="map-toolbar">
@@ -198,13 +297,16 @@ export function Explorer({
               <Search size={19} />
               <input
                 ref={searchRef}
-                aria-label="Search SkyCity"
-                placeholder="Search buildings, brands, neighborhoods…"
+                aria-label="Buscar en SkyCity"
+                placeholder="Busca solares, marcas, barrios…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
               {query ? (
-                <button aria-label="Clear search" onClick={() => setQuery("")}>
+                <button
+                  aria-label="Borrar búsqueda"
+                  onClick={() => setQuery("")}
+                >
                   <X size={15} />
                 </button>
               ) : (
@@ -212,7 +314,7 @@ export function Explorer({
               )}
             </div>
             <div className="quick-filters">
-              {filters.slice(0, 4).map((f) => (
+              {Object.entries(quickFilters).map(([f, label]) => (
                 <button
                   key={f}
                   aria-pressed={filter === f}
@@ -222,17 +324,15 @@ export function Explorer({
                     setIntroHidden(true);
                   }}
                 >
-                  {f !== "All buildings" && (
-                    <i className={`status-dot ${f.toLowerCase()}`} />
-                  )}{" "}
-                  {f === "All buildings" ? "All spots" : f}
+                  {dotClass[f] && <i className={`status-dot ${dotClass[f]}`} />}{" "}
+                  {label}
                 </button>
               ))}
             </div>
-            <label className="filter-select" title="More filters">
+            <label className="filter-select" title="Más filtros">
               <SlidersHorizontal size={17} />
               <select
-                aria-label="Filter properties"
+                aria-label="Filtrar solares"
                 value={filter}
                 onChange={(e) => {
                   setFilter(e.target.value);
@@ -248,19 +348,19 @@ export function Explorer({
           <div className="world-district-control">
             <button
               className={`district-trigger ${sidebar ? "active" : ""}`}
-              aria-label="Districts"
+              aria-label="Barrios"
               aria-expanded={sidebar}
               onClick={() => setSidebar(!sidebar)}
             >
               <MapPin size={22} />
               <span>
-                <strong>{focused?.name || "All of SkyCity"}</strong>
+                <strong>{focused?.name || "Toda SkyCity"}</strong>
                 <small>
                   {focused
                     ? data.properties.filter((p) => p.districtId === focused.id)
                         .length
-                    : data.stats.total}{" "}
-                  buildings
+                    : data.stats.plots}{" "}
+                  solares
                 </small>
               </span>
               <ChevronDown size={15} />
@@ -280,21 +380,21 @@ export function Explorer({
           {(list || query) && (
             <section
               className="directory world-directory"
-              aria-label="Building directory"
+              aria-label="Directorio de solares"
             >
               <div className="section-heading">
                 <div>
-                  <span className="eyebrow">FIND YOUR CORNER</span>
+                  <span className="eyebrow">ENCUENTRA TU RINCÓN</span>
                   <h2>
                     {matching.length}{" "}
-                    {filter === "Featured"
-                      ? "featured locations"
-                      : "matching buildings"}
+                    {filter === "Destacados"
+                      ? "ubicaciones destacadas"
+                      : "resultados"}
                   </h2>
                 </div>
                 <button
                   className="icon-button"
-                  aria-label="Close directory"
+                  aria-label="Cerrar directorio"
                   onClick={() => {
                     setList(false);
                     setQuery("");
@@ -310,22 +410,25 @@ export function Explorer({
                     <span>
                       <strong>{p.ad?.brand || p.name}</strong>
                       <small>
-                        {p.districtId.replaceAll("-", " ")} · #{p.number}
+                        {districtName(p.districtId, data.districts)} · #
+                        {p.number}
                       </small>
                     </span>
                     <b>
-                      {p.status === "auction" ? "Auction" : euro(offerPrice(p))}
+                      {p.status === "available"
+                        ? `Desde ${euro(p.price)}`
+                        : statusLabel[p.status]}
                     </b>
                     <ArrowUpRight size={15} />
                   </button>
                 ))}
               </div>
               {!matching.length && (
-                <p>No buildings match. Try another neighborhood or filter.</p>
+                <p>Ningún resultado. Prueba otro barrio u otro filtro.</p>
               )}
               {matching.length > 60 && (
                 <p className="microcopy">
-                  Showing 60 locations. Search to narrow it down.
+                  Mostrando 60 ubicaciones. Busca para afinar.
                 </p>
               )}
             </section>
@@ -334,38 +437,43 @@ export function Explorer({
             <PropertyPanel
               property={p}
               district={data.districts.find((d) => d.id === p.districtId)}
+              owned={!!mine}
               onClose={() => setSelected(null)}
               onClaim={() => {
                 track("claim_clicked", p.id);
                 setClaim(true);
               }}
+              onUpgrade={() => mine && setUpgrade(mine)}
               onShare={() => setShare(true)}
             />
           )}
           {error && (
             <p className="error world-error" role="status">
-              City updates paused. {error}
+              Actualizaciones de la ciudad en pausa. {error}
             </p>
           )}
           <div className="world-status">
             <div className="world-counters">
               <span>
-                <i className="status-dot available" />
-                <strong>{data.stats.available}</strong> available
+                <i className="status-dot claimed" />
+                <strong>{data.stats.built}</strong> edificios construidos
               </span>
               <span>
-                <i className="status-dot claimed" />
-                <strong>{data.stats.claimed}</strong> claimed
+                <i className="status-dot available" />
+                <strong>{data.stats.available}</strong> solares disponibles
+              </span>
+              <span>
+                <strong>{data.stats.builtPercent}%</strong> construido
               </span>
               <button
                 onClick={() => {
-                  setFilter("Auction");
+                  setFilter("Subastas");
                   setList(true);
                   setIntroHidden(true);
                 }}
               >
                 <i className="status-dot auction" />
-                {data.stats.auctions} auctions
+                {data.stats.auctions} subastas
               </button>
             </div>
             <button
@@ -374,13 +482,13 @@ export function Explorer({
               aria-expanded={activityOpen}
             >
               <Radio size={13} />
-              {data.demo ? "Demo city activity" : "Around the city"}
+              {data.demo ? "Actividad demo" : "Por la ciudad"}
               <ChevronDown size={12} />
             </button>
             {activityOpen && (
               <div className="world-activity">
                 <span className="eyebrow">
-                  {data.demo ? "DEMO ACTIVITY" : "AROUND THE CITY"}
+                  {data.demo ? "ACTIVIDAD DEMO" : "POR LA CIUDAD"}
                 </span>
                 {data.activity.slice(0, 5).map((a) => (
                   <button
@@ -397,7 +505,7 @@ export function Explorer({
                     <span>
                       <strong>{a.brand}</strong>
                       <small>
-                        {a.action}{" "}
+                        {activityLabel[a.action] || a.action}{" "}
                         {
                           data.properties.find((p) => p.id === a.propertyId)
                             ?.name
@@ -408,23 +516,23 @@ export function Explorer({
                   </button>
                 ))}
                 {!data.activity.length && (
-                  <p>The city is waiting for its first neighbor.</p>
+                  <p>La ciudad espera a su primer vecino.</p>
                 )}
                 <div className="world-links">
-                  <Link href="/about">About SkyCity</Link>
-                  <Link href="/admin">City Hall ↗</Link>
+                  <Link href="/about">Sobre SkyCity</Link>
+                  <Link href="/admin">Ayuntamiento ↗</Link>
                 </div>
               </div>
             )}
           </div>
           <div className="world-instructions">
             <Move size={16} />
-            <span>Drag to explore</span>
+            <span>Arrastra para explorar</span>
             <i />
-            <span>Scroll to zoom</span>
+            <span>Rueda para hacer zoom</span>
             <i />
             <MousePointer2 size={14} />
-            <span>Click to discover</span>
+            <span>Haz clic para descubrir</span>
           </div>
           <div className="world-map-controls">
             <div className="map-compass">
@@ -433,20 +541,17 @@ export function Explorer({
             </div>
             <div className="map-controls">
               <button
-                aria-label="Zoom in"
+                aria-label="Acercar"
                 onClick={() => setZoom((z) => z + 1)}
               >
                 <Plus size={19} />
               </button>
-              <button
-                aria-label="Zoom out"
-                onClick={() => setZoom((z) => z - 1)}
-              >
+              <button aria-label="Alejar" onClick={() => setZoom((z) => z - 1)}>
                 <Minus size={19} />
               </button>
               <span />
               <button
-                aria-label="Reset camera"
+                aria-label="Restablecer cámara"
                 onClick={() => {
                   setSelected(null);
                   setDistrict("all");
@@ -463,7 +568,7 @@ export function Explorer({
                 setSidebar(false);
                 setIntroHidden(true);
               }}
-              aria-label={list ? "Hide directory" : "Building directory"}
+              aria-label={list ? "Ocultar directorio" : "Directorio de solares"}
             >
               <Layers3 size={18} />
             </button>
@@ -473,15 +578,20 @@ export function Explorer({
       {claim && p && (
         <ClaimModal
           property={p}
-          durations={data.durations}
           demo={data.demo}
           onClose={() => setClaim(false)}
-          onComplete={async () => {
-            await refresh();
-            setClaim(false);
-            setCelebrate(true);
-            setShare(true);
-          }}
+          onComplete={() => completed(p.id)}
+        />
+      )}
+      {upgrade && p && (
+        <ClaimModal
+          property={p}
+          demo={data.demo}
+          upgradeLeaseId={upgrade.id}
+          initialAd={upgrade.ad}
+          email={upgrade.email}
+          onClose={() => setUpgrade(null)}
+          onComplete={() => completed(p.id)}
         />
       )}
       {share && p && (

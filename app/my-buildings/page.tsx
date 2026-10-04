@@ -4,7 +4,7 @@ import { readState } from "@/lib/store";
 import { isDemo } from "@/lib/config";
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "My buildings",
+  title: "Mis edificios",
   robots: { index: false, follow: false },
 };
 export default async function Page() {

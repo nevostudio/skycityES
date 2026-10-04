@@ -40,7 +40,7 @@ export function Modal({
         <span className="eyebrow">{title}</span>
         <button
           className="icon-button"
-          aria-label="Close dialog"
+          aria-label="Cerrar diálogo"
           onClick={onClose}
         >
           <X size={20} />

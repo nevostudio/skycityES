@@ -10,7 +10,7 @@ export async function GET(
   const { building } = await params;
   const data = citySnapshot(await readState(), isDemo());
   const p = data.properties.find((p) => p.id === building);
-  if (!p) return new Response("Not found", { status: 404 });
+  if (!p) return new Response("No encontrado", { status: 404 });
   const color = p.ad?.primary || "#92aa81";
   return new ImageResponse(
     <div
@@ -67,12 +67,12 @@ export async function GET(
             }}
           >
             {p.ad
-              ? "I just claimed a building in SkyCity."
-              : "A little corner of the internet, made yours."}
+              ? "Acabo de construir mi edificio en SkyCity."
+              : "Un pequeño rincón de internet, construido para ti."}
           </div>
         </div>
         <div style={{ display: "flex", fontSize: 16, letterSpacing: 3 }}>
-          SKYCITY / BUILDING #{String(p.number).padStart(3, "0")}
+          SKYCITY / SOLAR #{String(p.number).padStart(3, "0")}
         </div>
       </div>
       <div
@@ -98,7 +98,10 @@ export async function GET(
           ))}
           <path d="m90 63 34-17 33 16-34 17Z" fill="#c9d4bb" />
           <rect x="93" y="25" width="56" height="24" rx="3" fill="#faf7e9" />
-          <path d="M104 32h5v12h-5zM115 28h5v16h-5zM126 30h5v14h-5zM137 34h5v10h-5z" fill="#55744e"/>
+          <path
+            d="M104 32h5v12h-5zM115 28h5v16h-5zM126 30h5v14h-5zM137 34h5v10h-5z"
+            fill="#55744e"
+          />
         </svg>
       </div>
     </div>,

@@ -1,48 +1,51 @@
 import { Header } from "@/components/header";
 import { isDemo } from "@/lib/config";
 import Link from "next/link";
-export const metadata = { title: "A city of possibilities" };
+export const metadata = { title: "Una ciudad por construir" };
 export default function Page() {
   return (
     <>
       <Header demo={isDemo()} />
       <main className="about-page">
-        <span className="eyebrow">A LITTLE CITY. BIG POSSIBILITIES.</span>
-        <h1>A home for your next big idea.</h1>
+        <span className="eyebrow">
+          UNA CIUDAD PEQUEÑA. GRANDES POSIBILIDADES.
+        </span>
+        <h1>Una ciudad que se construye entre todos.</h1>
         <p>
-          SkyCity is a fictional, explorable city where every building is an
-          opportunity to be discovered. Independent brands, side projects, local
-          businesses and personal ideas all have a place here.
+          SkyCity es una ciudad virtual y explorable que empieza casi vacía:
+          calles, parques, el río y solares esperando una idea. Cada edificio
+          privado existe porque alguien compró su solar.
         </p>
-        <h2>Explore. Claim. Make it yours.</h2>
+        <h2>Elige un solar. Construye. Haz que crezca.</h2>
         <p>
-          Choose a building, add your name and colors, and claim a temporary
-          advertising placement. One building hosts one advertiser at a time.
-          Your price and duration are shown before checkout, and there are no
-          automatic recurring charges.
+          Elige un solar libre, decide el tamaño de tu edificio (STARTER 3 €,
+          PLUS 7 €, PRO 15 €, PREMIUM 30 € o LANDMARK 60 €), añade tu marca y
+          tus colores, y míralo levantarse. Es un pago único, sin renovaciones
+          ni cargos recurrentes. Más adelante puedes mejorarlo pagando solo la
+          diferencia: mismo solar, más altura.
         </p>
-        <h2>Your email is your key.</h2>
+        <h2>Tu email es tu llave.</h2>
         <p>
-          No account forms or passwords. Use the email from your checkout to
-          request a secure link from My Buildings. Update your advertisement,
-          see its activity, renew your stay or share your address.
+          Sin formularios de registro ni contraseñas. Usa el email de tu compra
+          para pedir un enlace seguro desde Mis edificios. Edita tu anuncio,
+          consulta su actividad, mejora tu edificio o comparte tu dirección.
         </p>
-        <h2>A good neighborhood starts with good neighbors.</h2>
+        <h2>Un buen barrio empieza por buenos vecinos.</h2>
         <p>
-          You must have permission to use the names, logos and images in your
-          advertisement. Illegal, deceptive or harmful content may be suspended.
-          A claim is a temporary advertising lease, not ownership of real estate
-          or an investment.
+          Debes tener permiso para usar los nombres, logos e imágenes de tu
+          anuncio. El contenido ilegal, engañoso o dañino puede suspenderse. Un
+          edificio en SkyCity es un espacio publicitario virtual, no una
+          propiedad inmobiliaria ni una inversión.
         </p>
         {isDemo() && (
           <div className="inline-notice">
-            You are exploring a demo city. Fictional brands and historical
-            activity are labeled as demo data. Payments and emails are
-            simulated.
+            Estás explorando una ciudad de demostración. Las marcas ficticias y
+            su actividad están marcadas como demo. Los pagos y correos son
+            simulados.
           </div>
         )}
         <Link href="/" className="button coral">
-          Find your place ↗
+          Elige tu solar ↗
         </Link>
       </main>
     </>

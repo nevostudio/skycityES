@@ -2,13 +2,13 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main className="auth-card">
-      <span className="eyebrow">OFF THE MAP</span>
-      <h1>This address is still a daydream.</h1>
+      <span className="eyebrow">FUERA DEL MAPA</span>
+      <h1>Esta dirección todavía es un sueño.</h1>
       <p className="muted">
-        We couldn’t find this building. There are plenty more to explore.
+        No encontramos este solar. Hay muchos más por explorar.
       </p>
       <Link href="/" className="button coral">
-        Back to SkyCity ↗
+        Volver a SkyCity ↗
       </Link>
     </main>
   );

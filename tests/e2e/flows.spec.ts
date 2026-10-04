@@ -1,78 +1,87 @@
 import { test, expect } from "@playwright/test";
-test("explore → claim → share → edit → renew → magic link", async ({
+type Plot = {
+  id: string;
+  name: string;
+  districtId: string;
+  status: string;
+  inventory: string;
+  building: { tier: string } | null;
+};
+async function freePlot(request: import("@playwright/test").APIRequestContext) {
+  const city = await (await request.get("/api/city")).json();
+  return city.properties.find(
+    (p: Plot) => p.status === "available" && p.inventory === "normal",
+  ) as Plot;
+}
+test("explorar → construir aquí → compartir → editar → enlace de acceso", async ({
   page,
   request,
 }) => {
-  const city = await (await request.get("/api/city")).json();
-  const p = city.properties.find(
-    (p: { status: string; prices: Record<string, number> }) =>
-      p.status === "available" && p.prices["30"] === 3,
-  );
+  const p = await freePlot(request);
+  expect(p.building).toBeNull();
   const email = `browser-${Date.now()}@skycity.demo`;
   await page.goto(`/city/${p.districtId}/${p.id}`);
   await expect(
     page.getByRole("heading", { name: p.name, exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Claim this building", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Construir aquí" }).click();
   await expect(
     page.locator('input[name="presence"][value="STARTER"]'),
   ).toBeChecked();
   await expect(
-    page.getByRole("group", { name: "Choose your presence in SkyCity" }),
+    page.getByRole("group", { name: "1. Elige el tamaño de tu edificio" }),
   ).toBeVisible();
   await page
-    .getByRole("textbox", { name: "Brand name", exact: true })
+    .getByRole("textbox", { name: "Nombre de la marca", exact: true })
     .fill("Browser Test Studio");
   await page
-    .getByRole("textbox", { name: "Website optional", exact: true })
+    .getByRole("textbox", { name: "Web opcional", exact: true })
     .fill("https://example.com");
-  await page.getByRole("textbox", { name: /Your email/ }).fill(email);
-  await page
-    .getByRole("button", { name: "Claim for €3.00", exact: true })
-    .click();
+  await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
+  await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await expect(
-    page.getByText("Demo checkout · no charge", { exact: true }),
+    page.getByText("Pago de demostración · sin cargo", { exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Complete demo claim", exact: true })
+    .getByRole("button", { name: "Completar pago de demostración" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Welcome to the neighborhood." }),
+    page.getByRole("heading", { name: "Bienvenido al barrio." }),
   ).toBeVisible();
   await expect(
-    page.getByText("I just claimed a building in SkyCity.", { exact: true }),
+    page.getByText("Acabo de construir mi edificio en SkyCity.", {
+      exact: true,
+    }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await page.getByRole("button", { name: "Cerrar diálogo" }).click();
   await expect(
     page.getByRole("heading", { name: "Browser Test Studio", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "My buildings", exact: true }).click();
+  const built = (await (await request.get("/api/city")).json()).properties.find(
+    (v: Plot) => v.id === p.id,
+  );
+  expect(built.building.tier).toBe("STARTER");
+  await page.getByRole("link", { name: "Mis edificios", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Browser Test Studio", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Edit ad", exact: true }).click();
+  await expect(page.getByText(/Pago único · Anuncio activo/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Renovar/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Editar anuncio" }).click();
   await page
-    .getByRole("textbox", { name: "Brand name", exact: true })
+    .getByRole("textbox", { name: "Nombre de la marca", exact: true })
     .fill("Browser Studio Updated");
-  await page.getByRole("button", { name: "Save advertisement" }).click();
+  await page.getByRole("button", { name: "Guardar anuncio" }).click();
   await expect(
     page.getByRole("heading", { name: "Browser Studio Updated", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Renew", exact: true }).click();
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await page.getByRole("textbox", { name: "Email" }).fill(email);
   await page
-    .getByRole("button", { name: "Renew for €3.00", exact: true })
+    .getByRole("button", { name: "Envíame un enlace de acceso" })
     .click();
   await page
-    .getByRole("button", { name: "Complete demo claim", exact: true })
-    .click();
-  await expect(page.getByText("60 days remaining · Ad active")).toBeVisible();
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.getByRole("textbox", { name: "Email address" }).fill(email);
-  await page.getByRole("button", { name: "Send me an access link" }).click();
-  await page
-    .getByRole("link", { name: "Open secure demo access link →" })
+    .getByRole("link", { name: "Abrir enlace de acceso demo →" })
     .click();
   await expect(
     page.getByRole("heading", { name: "Browser Studio Updated", exact: true }),
@@ -80,14 +89,12 @@ test("explore → claim → share → edit → renew → magic link", async ({
   const me = await (await page.request.get("/api/me")).json();
   expect(me.leases).toHaveLength(1);
   expect(me.leases[0].ad.brand).toBe("Browser Studio Updated");
+  expect(me.leases[0].expiresAt).toBeUndefined();
 });
-test("simultaneous requests cannot reserve the same property", async ({
+test("simultaneous requests cannot reserve the same plot", async ({
   request,
 }) => {
-  const city = await (await request.get("/api/city")).json();
-  const p = city.properties.find(
-    (p: { status: string }) => p.status === "available",
-  );
+  const p = await freePlot(request);
   const ad = {
     brand: "Race Test",
     description: "",
@@ -99,12 +106,12 @@ test("simultaneous requests cannot reserve the same property", async ({
     logo: "",
     banner: "",
     promo: "",
-    cta: "Visit website",
+    cta: "Visitar web",
     primary: "#abcdef",
     secondary: "#ffffff",
     style: "rooftop",
   };
-  const body = { propertyId: p.id, days: 30, email: "race@skycity.demo", ad };
+  const body = { propertyId: p.id, email: "race@skycity.demo", ad };
   const responses = await Promise.all([
     request.post("/api/checkout", { data: body }),
     request.post("/api/checkout", { data: body }),
@@ -131,61 +138,68 @@ test("private APIs deny strangers; demo magic links are single-use", async ({
   expect((await request.get(link.url)).status()).toBe(403);
   expect((await request.get("/api/admin")).status()).toBe(403);
 });
-test("admin can change skyscraper price and moderate; signed-in customers can bid", async ({
+test("admin can change the premium price and moderate; signed-in customers can bid", async ({
   page,
 }) => {
   await page.goto("/admin");
+  await page.getByRole("textbox", { name: "Email" }).fill("admin@skycity.demo");
   await page
-    .getByRole("textbox", { name: "Email address" })
-    .fill("admin@skycity.demo");
-  await page.getByRole("button", { name: "Send me an access link" }).click();
+    .getByRole("button", { name: "Envíame un enlace de acceso" })
+    .click();
   await page
-    .getByRole("link", { name: "Open secure demo access link →" })
+    .getByRole("link", { name: "Abrir enlace de acceso demo →" })
     .click();
   await page.goto("/admin");
   await expect(
-    page.getByRole("button", { name: "Add property" }),
+    page.getByRole("button", { name: "Añadir solar" }),
   ).toBeVisible();
   await page
-    .getByRole("textbox", { name: "Search properties" })
-    .fill("Tower #050");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page.getByRole("spinbutton", { name: "€ / 30 days" }).fill("230");
+    .getByRole("textbox", { name: "Buscar solares" })
+    .fill("Torre #050");
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
   await page
-    .getByRole("button", { name: "Save property", exact: true })
-    .click();
-  await expect(page.getByText("€230.00", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page.getByRole("spinbutton", { name: "€ / 30 days" }).fill("200");
+    .getByRole("spinbutton", { name: "Precio premium (€, pago único)" })
+    .fill("230");
   await page
-    .getByRole("button", { name: "Save property", exact: true })
+    .getByRole("button", { name: "Guardar solar", exact: true })
     .click();
-  await page.getByRole("button", { name: "Leases & ads", exact: true }).click();
+  await expect(page.getByText(/^230\s€$/)).toBeVisible();
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
+  await page
+    .getByRole("spinbutton", { name: "Precio premium (€, pago único)" })
+    .fill("200");
+  await page
+    .getByRole("button", { name: "Guardar solar", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Edificios y anuncios", exact: true })
+    .click();
   const first = page.locator(".admin-record").first();
-  await first.getByRole("button", { name: "Suspend ad" }).click();
-  await expect(first.getByText("suspended", { exact: true })).toBeVisible();
-  await first.getByRole("button", { name: "Activate ad" }).click();
+  await first.getByRole("button", { name: "Suspender anuncio" }).click();
+  await expect(first.getByText("suspendido", { exact: true })).toBeVisible();
+  await first.getByRole("button", { name: "Activar anuncio" }).click();
   await page.goto("/auctions");
   await page
-    .getByRole("button", { name: "Place a bid", exact: false })
+    .getByRole("button", { name: "Pujar", exact: false })
     .first()
     .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: /Place bid/ })
+    .getByRole("button", { name: /Pujar ·/ })
     .click();
-  await expect(page.getByRole("status")).toContainText("Your bid");
+  await expect(page.getByRole("status")).toContainText("Tu puja");
 });
 test("mobile city and bottom sheet fit without horizontal overflow", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => localStorage.setItem("skycity-welcome", "1"));
   await page.goto("/");
   await expect(page.locator("canvas")).toBeVisible();
-  await page.getByRole("button", { name: "Find my spot", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Elegir mi solar", exact: true })
+    .click();
   await expect(
-    page.getByRole("complementary", { name: "Selected building" }),
+    page.getByRole("complementary", { name: "Solar seleccionado" }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -193,10 +207,10 @@ test("mobile city and bottom sheet fit without horizontal overflow", async ({
     ),
   ).toBe(true);
   await page
-    .getByRole("button", { name: "Claim this building", exact: true })
+    .getByRole("button", { name: "CONSTRUIR AQUÍ", exact: true })
     .click();
   await expect(
-    page.getByRole("textbox", { name: "Brand name", exact: true }),
+    page.getByRole("textbox", { name: "Nombre de la marca", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("dialog")

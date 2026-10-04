@@ -10,10 +10,12 @@ export async function POST(req: Request) {
     checkOrigin(req);
     rateLimit(`upload:${req.headers.get("x-forwarded-for") || "local"}`, 8);
     if (Number(req.headers.get("content-length")) > 3 * 1024 * 1024)
-      throw new DomainError("Images must be smaller than 2 MB.");
+      throw new DomainError("Las imágenes deben pesar menos de 2 MB.");
     const f = (await req.formData()).get("file");
     if (!(f instanceof File) || f.size > 2 * 1024 * 1024)
-      throw new DomainError("Choose a PNG, JPEG or WebP image under 2 MB.");
+      throw new DomainError(
+        "Elige una imagen PNG, JPEG o WebP de menos de 2 MB.",
+      );
     const bytes = Buffer.from(await f.arrayBuffer());
     const ext = bytes
       .subarray(0, 8)
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
           ? "webp"
           : null;
     if (!ext)
-      throw new DomainError("Only PNG, JPEG and WebP images are supported.");
+      throw new DomainError("Solo se admiten imágenes PNG, JPEG y WebP.");
     const name = `${randomUUID()}.${ext}`;
     if (isDemo()) {
       const dir = path.join(

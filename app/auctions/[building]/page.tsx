@@ -12,7 +12,7 @@ export async function generateMetadata({
   const { building } = await params;
   const p = (await readState()).properties.find((p) => p.id === building);
   return {
-    title: `${p?.name || "Landmark"} auction`,
+    title: `Subasta de ${p?.name || "rascacielos"}`,
     alternates: { canonical: `/auctions/${building}` },
     openGraph: { images: [`/api/og/${building}`] },
   };

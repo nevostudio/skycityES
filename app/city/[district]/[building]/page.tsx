@@ -12,13 +12,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = data.properties.find(
     (p) => p.id === building && p.districtId === district,
   );
-  if (!p) return { title: "Building not found" };
-  const title = `${p.ad?.brand || p.name} in ${data.districts.find((d) => d.id === district)?.name}`;
+  if (!p) return { title: "Solar no encontrado" };
+  const title = `${p.ad?.brand || p.name} en ${data.districts.find((d) => d.id === district)?.name}`;
   return {
     title,
     description:
       p.ad?.description ||
-      `Claim ${p.name} in SkyCity and put your brand on the map.`,
+      `Construye tu edificio en ${p.name} de SkyCity y pon tu marca en el mapa.`,
     alternates: { canonical: `/city/${district}/${building}` },
     openGraph: {
       title,

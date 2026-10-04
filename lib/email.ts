@@ -24,7 +24,7 @@ export async function flushMail() {
         console.error("Access email generation failed", m.id);
         continue;
       }
-      m.text += `\n\nManage your building securely: ${appUrl()}/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink`;
+      m.text += `\n\nGestiona tu edificio de forma segura: ${appUrl()}/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=magiclink`;
       await transaction((s) => {
         const saved = s.mail.find((x) => x.id === m.id);
         if (saved) saved.text = m.text;
@@ -41,7 +41,7 @@ export async function flushMail() {
         from: process.env.EMAIL_FROM,
         to: [m.email],
         subject: m.subject,
-        text: `${m.text}\n\nVisit SkyCity: ${appUrl()}/my-buildings`,
+        text: `${m.text}\n\nVisita SkyCity: ${appUrl()}/my-buildings`,
       }),
     });
     if (res.ok) {
