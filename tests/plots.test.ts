@@ -23,6 +23,22 @@ const snap = (s: State, at = now) =>
 function legacyState(): State {
   const s = makeSeed(false, now);
   delete (s as Partial<State>).buildings;
+  // Recreate locations present in a pre-inventory-reduction database.
+  const base = s.properties.find((p) => p.id === "building-1")!;
+  for (const n of [3, 13, 39, 52, 65, 78, 104]) {
+    if (s.properties.some((p) => p.number === n)) continue;
+    const districtIndex = Math.floor((n - 1) / 30);
+    const i = (n - 1) % 30;
+    s.properties.push({
+      ...structuredClone(base),
+      id: `building-${n}`,
+      number: n,
+      districtId: s.districts[districtIndex].id,
+      x: s.districts[districtIndex].x + ((i % 6) - 2.5) * 4.8,
+      z: s.districts[districtIndex].z + (Math.floor(i / 6) - 2) * 5.3,
+      enabled: true,
+    });
+  }
   const types = ["Shop", "Office", "Tower", "House"];
   for (const p of s.properties) {
     p.prices = { "30": p.inventory === "skyscraper" ? 200 : 3 };
@@ -111,6 +127,7 @@ function legacyState(): State {
     },
   ];
   s.settings[0].plotsVersion = undefined;
+  s.settings[0].inventoryVersion = undefined;
   s.settings[0].durations = [30];
   return s as State;
 }
@@ -209,6 +226,11 @@ test("CASE C · reload: buildings persist in storage and survive a restart", asy
     delete g.skySqlite;
     const migrated = await store.readState();
     assert.equal(migrated.settings[0].plotsVersion, 1);
+    assert.equal(migrated.settings[0].inventoryVersion, 1);
+    assert.equal(
+      migrated.properties.find((p) => p.id === "building-3")?.enabled,
+      false,
+    );
     assert.equal(
       migrated.buildings.find((b) => b.leaseId === "lease-customer")?.tier,
       "PRO",
@@ -230,7 +252,7 @@ test("CASE D · plots without a buyer stay empty", () => {
   const empty = city.properties.filter(
     (p) => p.inventory === "normal" && p.id !== plot,
   );
-  assert.ok(empty.length > 180);
+  assert.ok(empty.length >= 70);
   assert.ok(
     empty.every((p) => p.building === null && p.status === "available"),
   );

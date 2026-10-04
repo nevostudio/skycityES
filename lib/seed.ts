@@ -8,6 +8,7 @@ import type {
   State,
 } from "@/types";
 import { PLOT_HEIGHT } from "./presence";
+import { isLaunchNormalPlot } from "./inventory";
 import {
   DEMO_DESCRIPTION,
   DEMO_SHOWCASE,
@@ -81,6 +82,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
       const n = di * 30 + i + 1;
       const type = zoning[di][i % zoning[di].length];
       const sky = SKYSCRAPER_PLOTS[n];
+      if (!sky && !isLaunchNormalPlot(n)) continue;
       properties.push({
         id: `building-${n}`,
         number: n,
@@ -191,6 +193,7 @@ export function makeSeed(demo = true, now = Date.now()): State {
         pricingVersion: 1,
         plotsVersion: 1,
         brandingVersion: 1,
+        inventoryVersion: 1,
       },
     ],
   };

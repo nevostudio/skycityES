@@ -221,6 +221,7 @@ export type Settings = {
   pricingVersion?: number;
   plotsVersion?: number;
   brandingVersion?: number;
+  inventoryVersion?: number;
 };
 export type State = {
   properties: Property[];

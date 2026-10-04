@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { District } from "@/types";
+import type { District, PublicProperty } from "@/types";
 import { districtStyle } from "./district-style";
 import { useSceneMotion } from "./scene-motion";
 
@@ -13,13 +13,19 @@ type Furniture = {
   c: string;
 };
 
-export function NeighborhoodDetails({ districts }: { districts: District[] }) {
+export function NeighborhoodDetails({
+  districts,
+  properties,
+}: {
+  districts: District[];
+  properties: PublicProperty[];
+}) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const items = useMemo(() => {
     const pieces: Furniture[] = [];
     const add = (p: Furniture["p"], s: Furniture["s"], c: string) =>
       pieces.push({ p, s, c });
-    districts.forEach((d) => {
+    districts.forEach((d, districtIndex) => {
       const style = districtStyle(d.id),
         old = d.id === "old-town",
         business = d.id === "business-district",
@@ -77,6 +83,36 @@ export function NeighborhoodDetails({ districts }: { districts: District[] }) {
         for (let x = -3; x <= 3; x++)
           add([d.x + x, 2.98, d.z - 14.5], [0.03, 0.025, 1.3], "#afcecd");
       }
+      // Turn part of the released grid into low, instanced urban infill. Active plots always
+      // win, including locations restored later from City Hall or protected by migration.
+      for (let i = 0; i < 30; i++) {
+        const x = d.x + ((i % 6) - 2.5) * 4.8;
+        const z = d.z + (Math.floor(i / 6) - 2) * 5.3;
+        if (
+          properties.some(
+            (p) => p.districtId === d.id && Math.hypot(p.x - x, p.z - z) < 1.2,
+          ) ||
+          (i + districtIndex) % 2
+        )
+          continue;
+        const variant = (i + districtIndex) % 3;
+        if (variant === 0) {
+          add([x, 0.39, z], [3.5, 0.08, 3.9], "#9eb68a");
+          add([x - 1.15, 0.72, z - 1.3], [0.7, 0.58, 0.7], style.trees);
+          add([x + 1.05, 0.66, z + 1.15], [0.8, 0.48, 0.8], style.trees);
+          add([x, 0.55, z], [1.4, 0.14, 0.42], "#a8815c");
+        } else if (variant === 1) {
+          add([x, 0.39, z], [3.55, 0.08, 3.95], "#858d87");
+          for (const side of [-1, 0, 1])
+            add([x + side * 1.05, 0.445, z], [0.055, 0.018, 3.1], "#e7e2ce");
+          add([x, 0.58, z - 1.6], [2.6, 0.28, 0.35], "#78906f");
+        } else {
+          add([x, 0.4, z], [3.5, 0.1, 3.9], "#d8d1bc");
+          add([x, 0.53, z], [2.5, 0.08, 0.45], style.trim);
+          add([x - 1.25, 0.68, z + 1.25], [0.55, 0.52, 0.55], style.trees);
+          add([x + 1.25, 0.68, z - 1.25], [0.55, 0.52, 0.55], style.trees);
+        }
+      }
     });
     // Timber promenade runs beside the existing river, clear of the parcels.
     for (let z = -54; z < 64; z += 1.2)
@@ -90,7 +126,7 @@ export function NeighborhoodDetails({ districts }: { districts: District[] }) {
       add([51.3, 1.4, z + 4], [0.06, 0.06, 8], "#d3d6c2");
     }
     return pieces;
-  }, [districts]);
+  }, [districts, properties]);
   useEffect(() => {
     if (!mesh.current) return;
     const dummy = new THREE.Object3D();

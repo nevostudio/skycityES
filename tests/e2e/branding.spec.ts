@@ -211,7 +211,13 @@ test("scenarios for visual review: PRO, LANDMARK, horizontal and square logos, n
     ],
   ];
   // Spread out so every scenario has its own neighbourhood in the screenshots.
-  const picks = [plots[3], plots[40], plots[80], plots[120]];
+  expect(plots.length).toBeGreaterThanOrEqual(4);
+  const picks = [
+    plots[2],
+    plots[Math.floor(plots.length / 3)],
+    plots[Math.floor((plots.length * 2) / 3)],
+    plots[plots.length - 2],
+  ];
   for (const [i, [, tier, ad]] of scenarios.entries())
     await build(page, picks[i], tier, ad);
   const city = await (await page.request.get("/api/city")).json();

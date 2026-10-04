@@ -16,10 +16,10 @@ const input = {
   email: "a@example.com",
   ad: { ...emptyAd, brand: "Test Brand" },
 };
-test("demo starts almost empty: 210 plots, 10 initial buildings and honest counters", () => {
+test("demo launches with scarce inventory, 10 initial buildings and honest counters", () => {
   const s = makeSeed(true, now);
   const d = citySnapshot(s, true, now);
-  assert.equal(d.properties.length, 210);
+  assert.equal(d.properties.length, 88);
   assert.equal(d.districts.length, 7);
   assert.equal(d.stats.publicBuilt, 6);
   assert.equal(d.stats.privateBuilt, 4);
@@ -32,9 +32,9 @@ test("demo starts almost empty: 210 plots, 10 initial buildings and honest count
       d.stats.publicBuilt +
       d.stats.auctions +
       d.stats.reserved,
-    210,
+    88,
   );
-  assert.equal(d.stats.builtPercent, 5);
+  assert.equal(d.stats.builtPercent, 11);
   // Only plots with a building are rendered as buildings.
   assert.equal(d.properties.filter((p) => p.building).length, 10);
   assert.equal(

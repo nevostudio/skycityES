@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { makeSeed } from "./seed";
 import { migratePresence } from "./presence";
 import { migrateBranding, migratePlots } from "./plots";
+import { migrateInventory } from "./inventory";
 import { isDemo } from "./config";
 import type { State } from "@/types";
 
@@ -53,10 +54,11 @@ function pg() {
 const isCurrent = (s: State) =>
   s.settings[0].pricingVersion === 1 &&
   s.settings[0].plotsVersion === 1 &&
-  s.settings[0].brandingVersion === 1;
+  s.settings[0].brandingVersion === 1 &&
+  s.settings[0].inventoryVersion === 1;
 /** Versioned, additive migrations applied inside the write transaction. */
 export const migrate = (s: State) =>
-  migrateBranding(migratePlots(migratePresence(s)));
+  migrateInventory(migrateBranding(migratePlots(migratePresence(s))));
 /** All economic writes serialize inside a database transaction. No browser state is authoritative. */
 export async function transaction<T>(fn: (state: State) => T): Promise<T> {
   if (isDemo()) {

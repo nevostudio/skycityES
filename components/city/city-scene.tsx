@@ -653,7 +653,7 @@ export default function CityScene({
         districts={districts}
         hidden={hiddenWindows}
       />
-      <NeighborhoodDetails districts={districts} />
+      <NeighborhoodDetails districts={districts} properties={properties} />
       <RiverLife />
       <PlotField
         plots={plots}

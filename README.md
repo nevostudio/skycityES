@@ -13,6 +13,14 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 - Edificios iniciales: 6 públicos (SkyCity HQ, NevoStudio, Ayuntamiento, Estación Central, Museo y Biblioteca) y, solo en demo, 4 marcas ficticias (Nova Labs, Pixel Coffee, Green Market y Moonlight Club).
 - Migración versionada (`plotsVersion`, `lib/plots.ts`): los leases activos pasan a edificios construidos y permanentes; los solares libres quedan vacíos; los anuncios demo sobrantes se retiran (marcados, no borrados). Usuarios, transacciones, pujas, subastas y analítica no cambian. En Postgres, aplica `supabase/migrations/20261004190000_plots_buildings.sql` con `npm run db:migrate`.
 
+## Inventario inicial y escasez
+
+- Una ciudad nueva empieza con **88 ubicaciones activas**: 80 solares normales o públicos y 8 oportunidades premium. Los solares normales se distribuyen entre Centro (15), Distrito Tecnológico (12), Distrito Financiero (10), Zona de Entretenimiento (10), Riverside (10), Casco Antiguo (12) y Zona Residencial (11).
+- La migración versionada (`inventoryVersion`, `lib/inventory.ts`) desactiva únicamente solares normales redundantes que siguen libres y no tienen actividad. Nunca borra registros ni desactiva ubicaciones relacionadas con edificios, propietarios, reservas, transacciones, subastas, pujas o analítica.
+- Los huecos liberados se integran en la ciudad como jardines, pequeñas plazas y aparcamientos. La configuración conserva calles, esquinas, primera línea y ubicaciones de escaparate para mejorar la separación y lectura de los carteles.
+- El límite de 80 solares normales solo define el lanzamiento inicial. City Hall puede crear ubicaciones, reactivar solares, cambiar su barrio o tipo, convertirlos en inventario premium y abrir nuevas zonas sin un límite fijo en tiempo de ejecución.
+- Los indicadores públicos se calculan desde las ubicaciones activas y los edificios reales. La reducción no necesita una migración SQL adicional porque `properties` y las versiones viven dentro del estado persistido existente.
+
 ## Escaparate y legibilidad
 
 - La home abre sobre un **escaparate curado** (`lib/showcase.ts`): la primera línea del Centro frente al bulevar, unas 15–25 parcelas a 1920×1080, con HQ y la Torre Central como skyline. El resto de la ciudad sigue disponible con arrastre y zoom; «Restablecer cámara» vuelve al escaparate.
@@ -50,7 +58,7 @@ npm start
 
 ## Lo que funciona
 
-- Ciudad WebGL urbanizada con **210 solares**, siete barrios, calles, cruces, aceras, parques, río, puentes, farolas y mobiliario. Solo se renderizan los edificios que existen; los solares vacíos se dibujan en cuatro `InstancedMesh` compartidos (bordillo, tierra, estacas y «+»). Ventanas por planta y árboles también instanciados.
+- Ciudad WebGL urbanizada con **88 ubicaciones activas de lanzamiento**, siete barrios, calles, cruces, aceras, parques, río, puentes, farolas y mobiliario. Solo se renderizan los edificios que existen; los solares vacíos se dibujan en cuatro `InstancedMesh` compartidos (bordillo, tierra, estacas y «+»). Ventanas, árboles y el relleno urbano también están instanciados.
 - Ciudad a pantalla completa bajo una barra de 68 px, sin sidebar ni tarjetas debajo del mapa. Búsqueda flotante, barrios desplegables, directorio y controles superpuestos.
 - Cámara ortográfica a escala de barrio: arrastrar para desplazar, rueda/pellizco para zoom y botón derecho/dos dedos para rotar. Al seleccionar, la cámara se acerca y los edificios cercanos se atenúan para despejar la vista. Ficha flotante en escritorio y panel inferior en móvil.
 - Marcas integradas mediante un rótulo principal y una superficie secundaria con logo, sin repetir el nombre por todas las fachadas. Pixel Coffee usa madera, vidrio cálido y terraza; Moonlight Club, neón violeta y una pulsación lenta; Green Market, cubierta plantada, toldo a rayas y vegetación. Los anunciantes propios conservan sus colores, logo, banner y estilo de cartel.
@@ -206,7 +214,7 @@ npx playwright test
 
 Los recorridos cubren los casos A–D (construir, mejorar pagando la diferencia, recargar y solares sin comprador vacíos), compartir, edición, magic link, carrera por la misma propiedad, acceso privado, administración, moderación, pujas y móvil. La prueba de exploración a **1920 × 1080** comprueba el canvas completo, marcas, selección sin redimensionar el mapa, barrios, filtros y navegación sin errores de consola. Los tests de navegador operan sobre la **ciudad demo** y crean datos de prueba; usa una carpeta `SKYCITY_DATA_DIR` separada si quieres conservar otra demostración. `TEST_URL` permite apuntar a otra instancia. No ejecutes estos tests contra producción.
 
-Pruebas realizadas durante el desarrollo: TypeScript, build de producción, 11 tests de dominio/PostgreSQL y seis recorridos Playwright, además de inspección visual a 1920 × 1080 y 390 × 844. **No se ha realizado una transacción con servicios Supabase/Stripe/Resend reales**, porque no se han configurado credenciales en este workspace.
+Pruebas realizadas durante el desarrollo: TypeScript, build de producción, 38 tests de dominio/PostgreSQL y diez recorridos Playwright, además de inspección visual a 1920 × 1080 y 390 × 844. **No se ha realizado una transacción con servicios Supabase/Stripe/Resend reales**, porque no se han configurado credenciales en este workspace.
 
 ## Despliegue
 
@@ -218,7 +226,7 @@ El modo demo no está pensado para el filesystem efímero de Vercel. `ALLOW_HOST
 
 - La ciudad es el producto; el contenido editorial solo acompaña a la exploración.
 - Sin cuotas recurrentes, cuentas obligatorias antes del checkout, cripto ni transferencias pagadas.
-- Modelos procedurales y geometrías compartidas; no son 210 modelos descargados. Los modelos son combinaciones de cubierta/fachada, escaladas y recoloreadas.
+- Modelos procedurales y geometrías compartidas; no se descarga un modelo independiente por solar. Los modelos son combinaciones de cubierta/fachada, escaladas y recoloreadas.
 - Logos/banners subidos se muestran en las páginas; carteles 3D usan nombre, colores y logo cuando CORS lo permite. No hay editor avanzado de texturas.
 - Las cifras siempre proceden del almacenamiento y el demo se identifica en pantalla.
 - El SQL y la lógica económica están probados localmente. Activar servicios reales requiere la prueba de integración con las credenciales del proyecto de destino.

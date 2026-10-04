@@ -42,5 +42,5 @@ test("the first view frames a district, not the whole map", () => {
   const near = city.properties.filter(
     (p) => Math.hypot(p.x - SHOWCASE.x, p.z - SHOWCASE.z) < width / 2.6,
   );
-  assert.ok(near.length >= 15 && near.length <= 40, `${near.length} plots`);
+  assert.ok(near.length >= 15 && near.length <= 25, `${near.length} plots`);
 });

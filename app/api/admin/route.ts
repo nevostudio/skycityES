@@ -104,14 +104,6 @@ export async function POST(req: Request) {
               "Los solares normales usan los tamaños de 3 € a 60 €. Las subastas son para rascacielos.",
             );
         }
-        if (
-          p.inventory === "skyscraper" &&
-          prev?.inventory !== "skyscraper" &&
-          s.properties.filter((p) => p.inventory === "skyscraper").length >= 10
-        )
-          throw new DomainError(
-            "La ciudad inicial está limitada a 10 rascacielos.",
-          );
         const busy =
           (!!prev && !!buildingFor(s, prev.id)) ||
           s.leases.some(
