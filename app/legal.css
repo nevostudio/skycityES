@@ -72,23 +72,39 @@
   color: var(--ink);
 }
 
-/* Home: discreet links next to the city activity toggle. */
+/* Home: a single, quiet link to the legal centre. */
 .world-legal {
-  display: inline-flex;
-  gap: 10px;
-  margin: 6px 0 0 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--glass);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--float);
+  display: inline-block;
+  margin: 6px 0 0 8px;
   font-size: 10px;
+  color: var(--muted);
+  opacity: 0.6;
 }
-.world-legal a {
-  color: var(--ink-soft, var(--muted));
-}
-.world-legal a:hover {
+.world-legal:hover {
   opacity: 1;
+}
+
+/* Legal centre: one card per document. */
+.legal-index {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.legal-index a {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-decoration: none;
+}
+.legal-index a:hover {
+  border-color: var(--ink);
+}
+.legal-index span {
+  font-size: 13px;
+  color: var(--muted);
 }
 
 /* Checkout: explicit acceptance before paying. */

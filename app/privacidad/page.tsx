@@ -8,8 +8,9 @@ export default function Page() {
     <LegalPage title="Privacidad">
       <h2>Responsable</h2>
       <p>
-        {LEGAL.owner} ({LEGAL.taxId}), con domicilio en {LEGAL.address}.
-        Contacto para cualquier cuestión de privacidad: {LEGAL.email}.
+        El titular de SkyCity, identificado en el{" "}
+        <a href="/aviso-legal">aviso legal</a>. Contacto para cualquier cuestión
+        de privacidad: {LEGAL.email}.
       </p>
 
       <h2>Qué datos tratamos</h2>

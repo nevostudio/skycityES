@@ -10,9 +10,10 @@ export default function Page() {
     <LegalPage title="Condiciones de compra" eyebrow="ANTES DE CONSTRUIR">
       <p>
         Estas condiciones regulan la compra de edificios en SkyCity, un servicio
-        de {LEGAL.owner} ({LEGAL.taxId}). Al pagar aceptas estas condiciones en
-        la versión vigente en ese momento. Léelas con calma, sobre todo el
-        apartado 5: explica cómo otra marca puede quedarse tu ubicación.
+        de su titular, identificado en el <a href="/aviso-legal">aviso legal</a>
+        . Al pagar aceptas estas condiciones en la versión vigente en ese
+        momento. Léelas con calma, sobre todo el apartado 5: explica cómo otra
+        marca puede quedarse tu ubicación.
       </p>
 
       <h2>1. Qué compras</h2>

@@ -19,7 +19,6 @@ import type { BuildingTier, CityData, Lease, PublicProperty } from "@/types";
 import { useCity } from "@/hooks/use-city";
 import { Header } from "../header";
 import { TopBrands } from "./top-brands";
-import { LegalLinks } from "../legal/legal-links";
 import { cityMetrics } from "@/lib/city-social";
 import { AUCTIONS_ENABLED } from "@/lib/features";
 import { DistrictSidebar } from "./district-sidebar";
@@ -377,7 +376,9 @@ export function Explorer({
               {data.demo ? "Actividad demo" : "Por la ciudad"}
               <ChevronDown size={12} />
             </button>
-            <LegalLinks className="world-legal" />
+            <Link className="world-legal" href="/legal">
+              Legal
+            </Link>
             {activityOpen && (
               <div className="world-activity">
                 <span className="eyebrow">

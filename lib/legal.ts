@@ -20,6 +20,7 @@ export const LEGAL = {
 };
 
 export const LEGAL_PAGES = [
+  { href: "/legal", label: "Centro legal" },
   { href: "/aviso-legal", label: "Aviso legal" },
   { href: "/privacidad", label: "Privacidad" },
   { href: "/cookies", label: "Cookies" },
