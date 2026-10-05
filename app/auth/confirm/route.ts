@@ -52,11 +52,16 @@ export async function GET(req: Request) {
                 ? "magiclink"
                 : "email",
           });
-      if (result.error)
+      if (result.error) {
+        // Reason only (no tokens) so failed sign-ins can be diagnosed in the logs.
+        console.error(
+          `auth/confirm ${code ? "code" : "token_hash"}: ${result.error.code || result.error.message}`,
+        );
         throw new DomainError(
           "Tu enlace de acceso no es válido o ha caducado.",
           403,
         );
+      }
     }
     return NextResponse.redirect(`${appUrl()}/my-buildings`);
   } catch (e) {
