@@ -12,7 +12,7 @@ import {
 import { isDemo, appUrl } from "@/lib/config";
 import { checkOrigin, fail } from "@/lib/http";
 import { adSchema, emailSchema } from "@/lib/validation";
-import { assignSkyscraper } from "@/lib/admin-inventory";
+import { assignBuilding, assignSkyscraper } from "@/lib/admin-inventory";
 import { PLOT_HEIGHT } from "@/lib/presence";
 import type { Ad } from "@/types";
 import { validMoney } from "@/lib/takeover-policy";
@@ -182,6 +182,37 @@ export async function POST(req: Request) {
           admin.email,
           isDemo(),
         );
+      } else if (input.action === "assign-building") {
+        const assignment = z
+          .object({
+            propertyId: z.string(),
+            email: emailSchema,
+            ad: adSchema,
+            tier: z
+              .enum(["STARTER", "PLUS", "PRO", "PREMIUM", "LANDMARK"])
+              .default("STARTER"),
+            ranking: z.enum(["featured", "hidden"]).optional(),
+          })
+          .parse(input);
+        const lease = assignBuilding(
+          s,
+          { ...assignment, ad: assignment.ad as Ad },
+          admin.email,
+          isDemo(),
+        );
+        if (assignment.ranking) lease.ranking = assignment.ranking;
+      } else if (input.action === "ranking") {
+        // Curation only: hide a brand, or feature it apart without a price.
+        const { leaseId, ranking } = z
+          .object({
+            leaseId: z.string(),
+            ranking: z.enum(["auto", "hidden", "featured"]),
+          })
+          .parse(input);
+        const l = s.leases.find((l) => l.id === leaseId);
+        if (!l) throw new DomainError("Edificio no encontrado", 404);
+        if (ranking === "auto") delete l.ranking;
+        else l.ranking = ranking;
       } else if (input.action === "moderate") {
         const status = z
           .enum(["active", "pending", "suspended", "rejected"])

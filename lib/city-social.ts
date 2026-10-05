@@ -3,19 +3,33 @@ import type { CityData, CityMetrics, PublicProperty, ValueStep } from "@/types";
 export type RankedBrand = { property: PublicProperty; value: number };
 export type LatestPurchase = { property: PublicProperty; payment: ValueStep };
 
-/** Paid, currently visible private brands only. Public buildings and seed showcases aren't buyers. */
+const visibleBrand = (p: PublicProperty) =>
+  p.building?.kind === "private" &&
+  p.status === "claimed" &&
+  p.ad?.status === "active";
+
+/**
+ * Paid, currently visible private brands only. Public buildings, City Hall placements and
+ * brands that City Hall hides or features separately are never ranked as buyers.
+ */
 export function rankBrands(properties: PublicProperty[]): RankedBrand[] {
   return properties
     .filter(
       (p) =>
-        p.building?.kind === "private" &&
-        p.status === "claimed" &&
-        p.ad?.status === "active" &&
+        visibleBrand(p) &&
+        !p.ranking &&
         p.valueHistory?.some((h) => h.amount > 0) &&
         (p.current_property_value ?? 0) > 0,
     )
     .map((property) => ({ property, value: property.current_property_value! }))
     .sort((a, b) => b.value - a.value || a.property.number - b.property.number);
+}
+
+/** Brands City Hall chose to feature: shown apart, without a price or a position. */
+export function featuredBrands(properties: PublicProperty[]) {
+  return properties
+    .filter((p) => visibleBrand(p) && p.ranking === "featured")
+    .sort((a, b) => a.number - b.number);
 }
 
 export function latestPurchase(

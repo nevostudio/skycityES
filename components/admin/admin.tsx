@@ -346,6 +346,33 @@ export function Admin({ demo }: { demo: boolean }) {
                         </small>
                       </div>
                       <span className="tag">{adStatus[l.ad.status]}</span>
+                      {l.assignedBy && (
+                        <span className="tag">Asignado · sin pago</span>
+                      )}
+                      <label className="ranking-control">
+                        Top marcas
+                        <select
+                          value={l.ranking || "auto"}
+                          disabled={busy}
+                          onChange={(e) =>
+                            action({
+                              action: "ranking",
+                              leaseId: l.id,
+                              ranking: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="auto">
+                            {l.assignedBy
+                              ? "No mostrar (sin pago)"
+                              : "Automático (por valor pagado)"}
+                          </option>
+                          <option value="featured">
+                            Destacada (sin importe)
+                          </option>
+                          <option value="hidden">Ocultar</option>
+                        </select>
+                      </label>
                       <button
                         className="button outline"
                         disabled={busy}

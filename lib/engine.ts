@@ -176,6 +176,8 @@ export function citySnapshot(
         ...withBuilding(p, b?.tier ?? null),
         building: b ? buildingView(b, p.model, now) : null,
         presenceTier: lease?.presenceTier,
+        assigned: lease?.assignedBy ? true : undefined,
+        ranking: lease?.ranking,
         takeover: takeoverState(s, p, now),
         valueHistory: history.get(p.id) || [],
         status:

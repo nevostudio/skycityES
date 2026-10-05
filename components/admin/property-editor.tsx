@@ -1,6 +1,8 @@
 "use client";
-import type { Property, District } from "@/types";
-import type { Dispatch, SetStateAction } from "react";
+import type { Ad, Property, District, PresenceTier } from "@/types";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { AdFields } from "../checkout/ad-fields";
+import { PRESENCE_TIERS } from "@/lib/presence";
 import { Modal } from "../modal";
 import { emptyAd } from "@/lib/seed";
 import { AUCTIONS_ENABLED } from "@/lib/features";
@@ -14,7 +16,7 @@ export function PropertyEditor({
 }: {
   edit: Property;
   setEdit: Dispatch<SetStateAction<Property | null>>;
-  data: { districts: District[] };
+  data: { districts: District[]; buildings?: { propertyId: string }[] };
   action: (body: unknown) => Promise<boolean>;
   error: string;
   busy: boolean;
@@ -54,7 +56,7 @@ export function PropertyEditor({
             <input
               type="checkbox"
               checked={!!edit.takeover_enabled}
-              disabled={edit.inventory !== "normal"}
+              disabled={edit.inventory === "public"}
               onChange={(e) =>
                 setEdit({ ...edit, takeover_enabled: e.target.checked })
               }
@@ -311,59 +313,108 @@ export function PropertyEditor({
           Guardar solar
         </button>
       </form>
-      {edit.id && edit.inventory === "skyscraper" && (
-        <form
-          className="manual-assignment"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            if (
-              await action({
-                action: "assign-skyscraper",
-                propertyId: edit.id,
-                email: f.get("email"),
-                ad: {
-                  ...emptyAd,
-                  brand: f.get("brand"),
-                  website: f.get("website"),
-                  primary: f.get("primary"),
-                },
-              })
-            )
-              setEdit(null);
-          }}
-        >
-          <h3>Asignar a una gran marca</h3>
-          <p className="field-hint">
-            Construye el rascacielos sin registrar un pago. Los edificios, pagos
-            y subastas en curso están protegidos.
-          </p>
-          <label>
-            Nombre de la marca
-            <input name="brand" required minLength={2} maxLength={40} />
-          </label>
-          <label>
-            Email del anunciante
-            <input name="email" type="email" required />
-          </label>
-          <label>
-            Web
-            <input name="website" type="url" placeholder="https://…" />
-          </label>
-          <label>
-            Color de marca
-            <input name="primary" type="color" defaultValue="#426d67" />
-          </label>
-          <button className="button outline wide" disabled={busy}>
-            Asignar rascacielos
-          </button>
-          {AUCTIONS_ENABLED && (
-            <p className="field-hint">
-              Para abrir pujas, usa Ayuntamiento → Subastas.
-            </p>
-          )}
-        </form>
-      )}
+      {edit.id &&
+        edit.inventory !== "public" &&
+        !data.buildings?.some((b) => b.propertyId === edit.id) && (
+          <AssignBuilding
+            property={edit}
+            action={action}
+            busy={busy}
+            onDone={() => setEdit(null)}
+          />
+        )}
     </Modal>
+  );
+}
+
+/**
+ * City Hall builds on a free plot without a payment: any size (skyscraper plots get their
+ * tower), with the full brand. It never counts as a purchase; Top marcas can feature it apart.
+ */
+function AssignBuilding({
+  property,
+  action,
+  busy,
+  onDone,
+}: {
+  property: Property;
+  action: (body: unknown) => Promise<boolean>;
+  busy: boolean;
+  onDone: () => void;
+}) {
+  const sky = property.inventory === "skyscraper";
+  const [ad, setAd] = useState<Ad>({ ...emptyAd });
+  const [email, setEmail] = useState("");
+  const [tier, setTier] = useState<PresenceTier>("STARTER");
+  const [ranking, setRanking] = useState<"featured" | "hidden">("featured");
+  return (
+    <form
+      className="manual-assignment"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (
+          await action({
+            action: "assign-building",
+            propertyId: property.id,
+            email,
+            ad,
+            tier,
+            ranking,
+          })
+        )
+          onDone();
+      }}
+    >
+      <h3>
+        {sky ? "Asignar a una gran marca" : "Montar un edificio sin pago"}
+      </h3>
+      <p className="field-hint">
+        Lo construye el Ayuntamiento: no se registra ningún pago y nunca aparece
+        como compra. Empieza sin valor y con la protección habitual; después
+        cualquiera puede quedarse la ubicación pagando.
+      </p>
+      {!sky && (
+        <label>
+          Tamaño del edificio
+          <select
+            value={tier}
+            onChange={(e) => setTier(e.target.value as PresenceTier)}
+          >
+            {PRESENCE_TIERS.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label>
+        Email del anunciante
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </label>
+      <small className="field-hint">
+        Con este email podrá editar la marca desde Mis edificios.
+      </small>
+      <AdFields ad={ad} onChange={setAd} tier={sky ? "SKYSCRAPER" : tier} />
+      <label>
+        En Top marcas
+        <select
+          value={ranking}
+          onChange={(e) => setRanking(e.target.value as "featured" | "hidden")}
+        >
+          <option value="featured">Destacada por SkyCity (sin importe)</option>
+          <option value="hidden">No mostrar</option>
+        </select>
+      </label>
+      <button
+        className="button outline wide"
+        disabled={busy || ad.brand.trim().length < 2}
+      >
+        {sky ? "Asignar rascacielos" : "Montar edificio"}
+      </button>
+    </form>
   );
 }

@@ -116,6 +116,8 @@ export type Lease = {
   presenceTier?: PresenceTier;
   upgradeHistory?: UpgradeRecord[];
   assignedBy?: string;
+  /** City Hall curation of Top marcas: hide a paid brand, or feature one without a price. */
+  ranking?: "hidden" | "featured";
 };
 export type Building = {
   id: string;
@@ -299,6 +301,9 @@ export type PublicProperty = Property & {
   ad?: Ad;
   views: number;
   presenceTier?: PresenceTier;
+  /** Placed by City Hall without a payment (the admin's identity is never exposed). */
+  assigned?: boolean;
+  ranking?: "hidden" | "featured";
   /** Real control history of the location: initial purchase, then completed takeovers. */
   valueHistory?: ValueStep[];
   takeover?: {

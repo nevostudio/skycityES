@@ -280,3 +280,8 @@ El ranking selecciona el edificio a través del flujo de cámara existente y abr
 - Páginas: `/aviso-legal`, `/privacidad`, `/cookies` y `/condiciones`, enlazadas desde la portada (junto a la actividad) y entre sí. La versión de las condiciones vive en `lib/legal.ts`; los datos del titular (`LEGAL_OWNER`, `LEGAL_TAX_ID`, `LEGAL_ADDRESS`, `LEGAL_EMAIL` y, en sociedades, `LEGAL_REGISTRY`) se leen de variables de entorno para que no queden en el repositorio público.
 - Antes de pagar (compra, mejora o takeover) el checkout exige dos casillas: aceptar condiciones y privacidad, incluido que un takeover no reembolsa al anterior controlador, y pedir la construcción inmediata con renuncia al desistimiento. La API rechaza la compra sin ellas (`consent` en `/api/checkout` y `/api/takeover`) y guarda en la reserva la versión aceptada y la fecha.
 - Los textos son un borrador redactado a partir del funcionamiento real de la app y deben revisarse con un profesional antes del lanzamiento público.
+
+## Edificios del Ayuntamiento y curación de Top marcas
+
+- **Montar un edificio sin pago** (City Hall → Solares → Editar un solar libre): cualquier tamaño en solares normales, la torre en los de rascacielos, con la marca completa (logo, colores, frase, web) y el email que podrá editarla en Mis edificios. No registra pagos ni aparece como compra; empieza sin valor, con la protección habitual, y después cualquiera puede quedarse la ubicación pagando.
+- **Top marcas** (City Hall → Edificios y anuncios): por edificio, *Automático* (las compras reales, por valor pagado), *Destacada* (sección aparte «Destacadas por SkyCity», sin importe ni posición) u *Ocultar*. Los edificios asignados nunca entran en el ranking de pago ni en «Última compra».

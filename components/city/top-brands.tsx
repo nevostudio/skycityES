@@ -4,6 +4,7 @@ import { ArrowUpRight, Trophy, X } from "lucide-react";
 import type { CityData, PublicProperty } from "@/types";
 import {
   rankBrands,
+  featuredBrands,
   latestPurchase,
   purchaseAge,
   socialNumber,
@@ -30,6 +31,7 @@ export function TopBrands({
   const trigger = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const entries = rankBrands(data.properties);
+  const featured = featuredBrands(data.properties);
   const latest = latestPurchase(data.properties);
   useEffect(() => {
     setNow(Date.now());
@@ -47,6 +49,66 @@ export function TopBrands({
   const select = (p: PublicProperty) => {
     setMobileOpen(false);
     onSelect(p);
+  };
+  /** One brand row: ranked entries carry their value and position, featured ones neither. */
+  const item = (p: PublicProperty, value?: number, i?: number) => {
+    const ad = p.ad!;
+    const website = brandWebsite(ad.website);
+    return (
+      <li key={p.id} className={selected === p.id ? "selected" : ""}>
+        <button
+          className="ranking-item"
+          aria-label={`Ver ${ad.brand} en ${p.name}`}
+          aria-pressed={selected === p.id}
+          onClick={() => select(p)}
+        >
+          <span
+            className="ranking-avatar"
+            style={{
+              background: ad.primary,
+              color: contrastInk(ad.primary),
+            }}
+          >
+            {i !== undefined && (
+              <span className={`ranking-position ${i < 3 ? "podium" : ""}`}>
+                {i + 1}
+              </span>
+            )}
+            {ad.brand.trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="ranking-copy">
+            <span className="ranking-name">
+              <strong>{ad.brand}</strong>
+              {value !== undefined ? (
+                <b>{euro(value)}</b>
+              ) : (
+                <em className="ranking-featured-tag">Destacada</em>
+              )}
+            </span>
+            {(ad.tagline || ad.description) && (
+              <span className="ranking-description">
+                {ad.tagline || ad.description}
+              </span>
+            )}
+            <span className="ranking-location">
+              {p.name} · {socialNumber(p.views)} visitas
+            </span>
+          </span>
+        </button>
+        {website && (
+          <a
+            className="ranking-website"
+            href={website}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Visitar web de ${ad.brand}`}
+            onClick={() => track("external_link_click", p.id)}
+          >
+            Visitar web <ArrowUpRight size={12} />
+          </a>
+        )}
+      </li>
+    );
   };
   return (
     <div hidden={hidden}>
@@ -112,64 +174,21 @@ export function TopBrands({
             </span>
           </button>
         )}
-        <ol className="ranking-list">
-          {entries.map(({ property: p, value }, i) => {
-            const ad = p.ad!;
-            const website = brandWebsite(ad.website);
-            return (
-              <li key={p.id} className={selected === p.id ? "selected" : ""}>
-                <button
-                  className="ranking-item"
-                  aria-label={`Ver ${ad.brand} en ${p.name}`}
-                  aria-pressed={selected === p.id}
-                  onClick={() => select(p)}
-                >
-                  <span
-                    className="ranking-avatar"
-                    style={{
-                      background: ad.primary,
-                      color: contrastInk(ad.primary),
-                    }}
-                  >
-                    <span
-                      className={`ranking-position ${i < 3 ? "podium" : ""}`}
-                    >
-                      {i + 1}
-                    </span>
-                    {ad.brand.trim().charAt(0).toUpperCase()}
-                  </span>
-                  <span className="ranking-copy">
-                    <span className="ranking-name">
-                      <strong>{ad.brand}</strong>
-                      <b>{euro(value)}</b>
-                    </span>
-                    {(ad.tagline || ad.description) && (
-                      <span className="ranking-description">
-                        {ad.tagline || ad.description}
-                      </span>
-                    )}
-                    <span className="ranking-location">
-                      {p.name} · {socialNumber(p.views)} visitas
-                    </span>
-                  </span>
-                </button>
-                {website && (
-                  <a
-                    className="ranking-website"
-                    href={website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Visitar web de ${ad.brand}`}
-                    onClick={() => track("external_link_click", p.id)}
-                  >
-                    Visitar web <ArrowUpRight size={12} />
-                  </a>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-        {!entries.length && (
+        {entries.length > 0 && (
+          <ol className="ranking-list">
+            {entries.map(({ property: p, value }, i) => item(p, value, i))}
+          </ol>
+        )}
+        {featured.length > 0 && (
+          <section
+            className="ranking-featured"
+            aria-label="Destacadas por SkyCity"
+          >
+            <h3>Destacadas por SkyCity</h3>
+            <ul className="ranking-list">{featured.map((p) => item(p))}</ul>
+          </section>
+        )}
+        {!entries.length && !featured.length && (
           <div className="ranking-empty">
             <Trophy size={28} />
             <h3>Tu marca puede ser la primera.</h3>
