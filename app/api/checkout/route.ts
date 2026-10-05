@@ -6,6 +6,7 @@ import { checkOrigin, fail, rateLimit } from "@/lib/http";
 import { requireIdentity } from "@/lib/auth";
 import { createSession } from "@/lib/stripe";
 import type { Ad } from "@/types";
+import { LEGAL } from "@/lib/legal";
 export async function POST(req: Request) {
   try {
     checkOrigin(req);
@@ -13,9 +14,16 @@ export async function POST(req: Request) {
     const input = claimSchema.parse(await req.json());
     if (input.upgradeLeaseId) input.email = (await requireIdentity()).email;
     const demo = isDemo();
-    const result = await transaction((s) =>
-      reserve(s, { ...input, ad: input.ad as Ad }, demo),
-    );
+    const result = await transaction((s) => {
+      const res = reserve(s, { ...input, ad: input.ad as Ad }, demo);
+      // Evidence of what the buyer accepted, kept with the purchase.
+      res.reservation.consent = {
+        termsVersion: LEGAL.version,
+        acceptedAt: new Date().toISOString(),
+        immediate: true,
+      };
+      return res;
+    });
     if (demo)
       return Response.json({
         reservation: result.reservation.id,

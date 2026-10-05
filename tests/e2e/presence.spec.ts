@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { emptyAd } from "../../lib/seed";
+import { acceptTerms, consent } from "./consent";
 type Plot = {
   id: string;
   name: string;
@@ -39,6 +40,7 @@ test("CASE A–D in the browser: build on the map, grow STARTER → PRO paying 1
     .fill("Growing Studio");
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
+  await acceptTerms(page);
   await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await page
     .getByRole("button", { name: "Completar pago de demostración" })
@@ -58,6 +60,7 @@ test("CASE A–D in the browser: build on the map, grow STARTER → PRO paying 1
   await page.locator('input[name="presence"][value="PRO"]').check();
   await expect(page.getByText(/^Pagas 12\s€$/)).toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
+  await acceptTerms(page);
   await page.getByRole("button", { name: /Mejorar por 12\s€/ }).click();
   snapshot = await (await request.get("/api/city")).json();
   expect(
@@ -94,6 +97,7 @@ test("CASE A–D in the browser: build on the map, grow STARTER → PRO paying 1
     (
       await request.post("/api/checkout", {
         data: {
+          consent,
           propertyId: p.id,
           email,
           ad: { ...emptyAd, brand: "Intruder" },
@@ -123,6 +127,7 @@ test("skyscraper plots sell at a fixed price; admin can reserve, release and ass
     page.getByRole("button", { name: "Construir rascacielos" }),
   ).toBeEnabled();
   const input = {
+    consent,
     propertyId: p.id,
     email: "major@example.com",
     ad: { ...emptyAd, brand: "Major Brand" },

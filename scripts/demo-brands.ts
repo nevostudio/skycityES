@@ -138,6 +138,7 @@ async function main() {
       banner: b.banner ? await upload(b.banner, "banner") : "",
     };
     const r = await post("/api/checkout", {
+      consent: { terms: true, immediate: true },
       propertyId: plot.id,
       email: `demo-${i}@skycity.demo`,
       presenceTier: b.tier,

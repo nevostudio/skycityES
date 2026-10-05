@@ -151,6 +151,8 @@ export type Reservation = {
   presenceTier?: PresenceTier;
   fromTier?: PresenceTier;
   accessHash: string;
+  /** Terms version accepted, when, and the request for immediate delivery. */
+  consent?: { termsVersion: string; acceptedAt: string; immediate: true };
 };
 export type Auction = {
   id: string;

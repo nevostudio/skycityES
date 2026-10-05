@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { acceptTerms, consent } from "./consent";
 type Plot = {
   id: string;
   name: string;
@@ -41,6 +42,7 @@ test("explorar → construir aquí → compartir → editar → enlace de acceso
     .fill("https://example.com");
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
+  await acceptTerms(page);
   await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await expect(
     page.getByText("Pago de demostración · sin cargo", { exact: true }),
@@ -114,7 +116,12 @@ test("simultaneous requests cannot reserve the same plot", async ({
     secondary: "#ffffff",
     style: "rooftop",
   };
-  const body = { propertyId: p.id, email: "race@skycity.demo", ad };
+  const body = {
+    consent,
+    propertyId: p.id,
+    email: "race@skycity.demo",
+    ad,
+  };
   const responses = await Promise.all([
     request.post("/api/checkout", { data: body }),
     request.post("/api/checkout", { data: body }),

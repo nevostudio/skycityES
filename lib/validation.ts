@@ -57,7 +57,15 @@ export const adSchema = z.object({
     .enum(["draft", "pending", "active", "rejected", "suspended"])
     .optional(),
 });
+/** Explicit acceptance before paying: purchase terms + immediate delivery (withdrawal waiver). */
+export const consentSchema = z
+  .object({ terms: z.boolean(), immediate: z.boolean() })
+  .refine((c) => c.terms && c.immediate, {
+    message:
+      "Para continuar, acepta las condiciones de compra y la construcción inmediata del edificio.",
+  });
 export const claimSchema = z.object({
+  consent: consentSchema,
   propertyId: z.string().max(80),
   email: emailSchema,
   ad: adSchema,
@@ -67,6 +75,7 @@ export const claimSchema = z.object({
     .default("STARTER"),
 });
 export const takeoverSchema = z.object({
+  consent: consentSchema,
   propertyId: z.string().max(80),
   email: emailSchema,
   ad: adSchema,

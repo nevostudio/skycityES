@@ -83,6 +83,8 @@ export function ClaimModal({
       : claimPrice(p, presenceTier);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [terms, setTerms] = useState(false);
+  const [immediate, setImmediate] = useState(false);
   const [checkout, setCheckout] = useState<Checkout | null>(null);
   const [remaining, setRemaining] = useState("");
   const steps: Step[] =
@@ -120,6 +122,12 @@ export function ClaimModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!last) return next();
+    if (!terms || !immediate) {
+      setError(
+        "Para continuar, acepta las condiciones de compra y la construcción inmediata del edificio.",
+      );
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -132,6 +140,7 @@ export function ClaimModal({
           upgradeLeaseId,
           presenceTier,
           offerAmount: takeoverOffer,
+          consent: { terms, immediate },
         },
       );
       if (result.url) {
@@ -212,24 +221,23 @@ export function ClaimModal({
             <strong>{euro(amount)}</strong>
             <span>Pago único</span>
           </div>
-          {!sky && (
-            <div className="takeover-notice">
-              <strong>{CONTROL_NOTICE}</strong>
-              <p>{TRANSFER_NOTICE}</p>
+          {/* Every location, skyscrapers included, can change hands. */}
+          <div className="takeover-notice">
+            <strong>{CONTROL_NOTICE}</strong>
+            <p>{TRANSFER_NOTICE}</p>
+            <p>
+              Tras el pago tendrás {p.takeover?.protectionHours ?? 24} horas de
+              protección. El anterior controlador no recibe dinero ni
+              compensación.
+            </p>
+            {takeover && (
               <p>
-                Tras el pago tendrás {p.takeover?.protectionHours ?? 24} horas
-                de protección. El anterior controlador no recibe dinero ni
-                compensación.
+                Tu importe se convertirá en el nuevo valor que deberá superar la
+                siguiente persona. Si el control cambia durante el pago, no
+                recibirás la ubicación y se devolverá íntegramente tu pago.
               </p>
-              {takeover && (
-                <p>
-                  Tu importe se convertirá en el nuevo valor que deberá superar
-                  la siguiente persona. Si el control cambia durante el pago, no
-                  recibirás la ubicación y se devolverá íntegramente tu pago.
-                </p>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </aside>
         <div className="sc-checkout-main">
           {!checkout && (
@@ -344,12 +352,43 @@ export function ClaimModal({
                       Tu recibo y un enlace de acceso seguro. Sin contraseñas.
                     </small>
                   </label>
+                  <div className="consent-checks">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={terms}
+                        onChange={(e) => setTerms(e.target.checked)}
+                      />
+                      <span>
+                        He leído y acepto las{" "}
+                        <a href="/condiciones" target="_blank">
+                          condiciones de compra
+                        </a>{" "}
+                        y la{" "}
+                        <a href="/privacidad" target="_blank">
+                          política de privacidad
+                        </a>
+                        . Entiendo que, pasada la protección, otra marca puede
+                        quedarse esta ubicación pagando más y que entonces no se
+                        me devuelve lo que pagué.
+                      </span>
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={immediate}
+                        onChange={(e) => setImmediate(e.target.checked)}
+                      />
+                      <span>
+                        Quiero que el edificio se construya en cuanto pague y
+                        acepto que, por eso, pierdo el derecho de desistimiento.
+                      </span>
+                    </label>
+                  </div>
                   <p className="fine-print">
-                    Al continuar aceptas mostrar tu marca en SkyCity. Debes
-                    tener los derechos de tu contenido; los anuncios ilegales o
-                    dañinos pueden suspenderse. Un edificio en SkyCity es un
-                    espacio publicitario virtual, no una propiedad inmobiliaria
-                    ni una inversión.
+                    Un edificio en SkyCity es un espacio publicitario virtual,
+                    no una propiedad inmobiliaria ni una inversión. Debes tener
+                    los derechos del contenido de tu marca.
                   </p>
                 </>
               )}

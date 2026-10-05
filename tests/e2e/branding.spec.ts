@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { emptyAd } from "../../lib/seed";
+import { acceptTerms, consent } from "./consent";
 
 type Plot = {
   id: string;
@@ -64,6 +65,7 @@ async function build(
   const r = await (
     await page.request.post("/api/checkout", {
       data: {
+        consent,
         propertyId: plot.id,
         email: `brand-${Date.now()}-${tier}@skycity.demo`,
         presenceTier: tier,
@@ -113,6 +115,7 @@ test("brand editor: upload a transparent logo, phrase and colors; branding persi
   ).toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
+  await acceptTerms(page);
   await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await page
     .getByRole("button", { name: "Completar pago de demostración" })

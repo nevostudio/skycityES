@@ -274,3 +274,9 @@ El ranking selecciona el edificio a través del flujo de cámara existente y abr
 - **Soportes por tier** (`brandPlan` en `lib/brand-plan.ts`): STARTER una placa en fachada; PLUS cartel superior y panel frontal; PRO cartel y panel frontal (lateral si se pide valla lateral); PREMIUM fachada grande y panel lateral o banda vertical; LANDMARK todo, con cartel iluminado.
 - **Logos e imágenes**: los logos se muestran completos (`contain`) sobre una placa que contrasta con el propio logo; un logo horizontal genera un panel ancho y uno cuadrado un panel grande. Las imágenes promocionales llenan el panel (`cover`) salvo que el recorte supere ~20 %; entonces se muestran completas sobre el color de marca.
 - **Ejemplos**: `npm run demo:brands -- http://localhost:3000` añade diez marcas ficticias variadas a una ciudad demo (solo funciona en modo demo).
+
+## Textos legales y aceptación en el checkout
+
+- Páginas: `/aviso-legal`, `/privacidad`, `/cookies` y `/condiciones`, enlazadas desde la portada (junto a la actividad) y entre sí. Los datos del titular y la versión de las condiciones viven en `lib/legal.ts`.
+- Antes de pagar (compra, mejora o takeover) el checkout exige dos casillas: aceptar condiciones y privacidad, incluido que un takeover no reembolsa al anterior controlador, y pedir la construcción inmediata con renuncia al desistimiento. La API rechaza la compra sin ellas (`consent` en `/api/checkout` y `/api/takeover`) y guarda en la reserva la versión aceptada y la fecha.
+- Los textos son un borrador redactado a partir del funcionamiento real de la app y deben revisarse con un profesional antes del lanzamiento público.

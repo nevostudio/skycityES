@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { emptyAd } from "../../lib/seed";
 import type { CityData } from "../../types";
+import { acceptTerms, consent } from "./consent";
 
 test("automatic takeover: visible terms, unchanged PRO building, concurrent payments, former owner denied, admin controls and history", async ({
   page,
@@ -35,7 +36,12 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
     const ad = { ...emptyAd, brand: "Original Takeover Brand" };
     const initial = await (
       await request.post("/api/checkout", {
-        data: { propertyId: p.id, email: "takeover-original@example.com", ad },
+        data: {
+          consent,
+          propertyId: p.id,
+          email: "takeover-original@example.com",
+          ad,
+        },
       })
     ).json();
     const old = (
@@ -46,6 +52,7 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
     const up = await (
       await request.post("/api/checkout", {
         data: {
+          consent,
           propertyId: p.id,
           email: old.email,
           ad,
@@ -88,6 +95,7 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
     await dialog
       .getByRole("textbox", { name: /Tu email/ })
       .fill("takeover-new@example.com");
+    await acceptTerms(page);
     await dialog
       .getByRole("button", { name: /HACERME CON ESTA UBICACIÓN por/ })
       .click();
@@ -118,6 +126,7 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
       (
         await request.post("/api/checkout", {
           data: {
+            consent,
             propertyId: p.id,
             email: old.email,
             ad,
@@ -141,6 +150,7 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
       [102, 103].map(async (offerAmount) => {
         const res = await request.post("/api/takeover", {
           data: {
+            consent,
             propertyId: p.id,
             email: `race-${offerAmount}@example.com`,
             ad,
@@ -188,6 +198,7 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
       (
         await request.post("/api/takeover", {
           data: {
+            consent,
             propertyId: p.id,
             email: "blocked@example.com",
             ad,
