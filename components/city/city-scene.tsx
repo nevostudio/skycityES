@@ -28,6 +28,13 @@ import { brandKind } from "@/lib/brand-theme";
 import { districtStyle } from "./district-style";
 import { useSceneMotion } from "./scene-motion";
 import { NeighborhoodDetails, RiverLife } from "./neighborhood-details";
+
+/** Camera offset from its target; VIEW is its horizontal direction towards the camera. */
+const CAMERA_OFFSET: [number, number, number] = [93, 107, 139];
+const VIEW = (() => {
+  const l = Math.hypot(CAMERA_OFFSET[0], CAMERA_OFFSET[2]);
+  return [CAMERA_OFFSET[0] / l, CAMERA_OFFSET[2] / l] as const;
+})();
 function Instances({
   items,
   geometry = box,
@@ -583,9 +590,15 @@ export default function CityScene({
               return false;
             const dx = p.x - selectedProperty.x,
               dz = p.z - selectedProperty.z;
+            // Only what stands between the camera and the selection: in front of it along
+            // the view, roughly in line with it, and tall enough to hide it.
+            const ahead = dx * VIEW[0] + dz * VIEW[1];
+            const aside = Math.abs(dx * VIEW[1] - dz * VIEW[0]);
             return (
-              Math.hypot(dx, dz) < 10 &&
-              p.height > selectedProperty.height * 0.6
+              ahead > 1 &&
+              ahead < 14 &&
+              aside < 5 &&
+              p.height > Math.max(2.5, selectedProperty.height * 0.6)
             );
           })
           .map((p) => p.id),
@@ -609,7 +622,7 @@ export default function CityScene({
       orthographic
       camera={{
         // Offset from the orbit target; the first frame snaps it onto the showcase.
-        position: [93, 107, 139],
+        position: CAMERA_OFFSET,
         zoom: 40,
         near: 0.1,
         far: 650,

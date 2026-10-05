@@ -271,8 +271,11 @@ export const Building = memo(function Building({
         material.userData.baseOpacity ??= material.opacity;
         material.userData.baseTransparent ??= material.transparent;
         material.userData.baseDepthWrite ??= material.depthWrite;
+        const transparent = faded || material.userData.baseTransparent;
+        // Opaque materials compile without alpha: switching needs a recompile.
+        if (material.transparent !== transparent) material.needsUpdate = true;
         material.opacity = faded ? 0.1 : material.userData.baseOpacity;
-        material.transparent = faded || material.userData.baseTransparent;
+        material.transparent = transparent;
         material.depthWrite = faded ? false : material.userData.baseDepthWrite;
       });
     });
