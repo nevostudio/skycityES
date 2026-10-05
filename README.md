@@ -222,7 +222,7 @@ Una subasta sin pujas se cierra. Las adjudicaciones impagadas requieren revisió
 
 Para envíos reales configura `RESEND_API_KEY` y `EMAIL_FROM` con un dominio verificado. Los correos de confirmación generan un enlace Magic Link con Supabase y conservan el cuerpo antes de enviar. Resend recibe una clave de idempotencia. El webhook intenta vaciar el outbox tras responder; el mantenimiento reintenta los pendientes. Los enlaces solicitados expresamente en My Buildings los entrega Supabase Auth a través de su SMTP.
 
-`GET /api/cron` requiere `Authorization: Bearer <CRON_SECRET>`. Procesa vencimientos, subastas, reconciliación Stripe y hasta 30 correos por ejecución. `vercel.json` contiene una ejecución cada diez minutos: necesita un plan que admita esa frecuencia o un programador externo equivalente. Sin mantenimiento periódico no se garantizan los avisos ni el cierre puntual de subastas.
+`GET /api/cron` requiere `Authorization: Bearer <CRON_SECRET>`. Procesa vencimientos, subastas, reconciliación Stripe y hasta 30 correos por ejecución. `vercel.json` programa una ejecución diaria (lo que permite el plan Hobby de Vercel) como red de seguridad; la frecuencia real (cada 10 minutos) la aporta un programador externo, por ejemplo cron-job.org, llamando a `/api/cron` con esa cabecera. Con el plan Pro puede cambiarse el `schedule` a `*/10 * * * *` y prescindir del externo. Sin mantenimiento periódico no se garantizan los avisos ni el cierre puntual de subastas.
 
 ## Métricas
 
