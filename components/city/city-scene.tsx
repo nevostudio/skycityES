@@ -92,13 +92,7 @@ function Details({
             vd = v.d * p.depth,
             cx = p.x + v.x * p.width,
             cz = p.z + v.z * p.depth;
-          const branded =
-            brand &&
-            (m.pattern === "rooftop" ||
-              m.pattern === "wrapped" ||
-              m.pattern === "billboard") &&
-            v.role !== "base";
-          const c = branded
+          const c = brand
             ? brand.window
             : v.role !== "base" && m.glassTop
               ? "#7f99a1"

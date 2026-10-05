@@ -341,13 +341,15 @@ export function drawScreen(
 }
 
 /**
- * Dominant brand panel (front or side): the advertising image when there is one, otherwise
- * the logo (or initial) large on the brand colour, readable at normal zoom.
+ * Brand panel built into the facade. An uploaded image fills it as a large visual; otherwise
+ * the logo (or the brand emblem) sits large on a plate that contrasts with the brand-coloured
+ * body, next to the name when the panel is wide, above it when it is tall. A wide logo that
+ * already contains the name fills the plate on its own.
  */
 export function drawBrandPanel(
   canvas: HTMLCanvasElement,
   ad: Ad,
-  colors: { primary: string; secondary: string },
+  colors: { primary: string; secondary: string; deep: string },
   image: Bitmap | null,
   logo: Bitmap | null,
 ) {
@@ -359,36 +361,54 @@ export function drawBrandPanel(
     cover(c, image, 0, 0, W, H);
     return;
   }
-  c.fillStyle = colors.primary;
+  const light = luminance(colors.primary) > 0.62;
+  const plate = light ? "#1c2826" : "#fbf8f1";
+  const ink = light
+    ? "#fbf8f1"
+    : luminance(colors.primary) < 0.5
+      ? colors.primary
+      : colors.deep;
+  c.fillStyle = plate;
   c.fillRect(0, 0, W, H);
-  const tile = Math.min(W, H) * 0.7;
-  const x = (W - tile) / 2,
-    y = (H - tile) / 2;
-  c.fillStyle = "#fbf8f1";
-  roundRect(c, x, y, tile, tile, tile * 0.2);
-  c.fill();
-  if (logo)
-    contain(
-      c,
-      logo,
-      x + tile * 0.12,
-      y + tile * 0.12,
-      tile * 0.76,
-      tile * 0.76,
-    );
-  else {
-    c.fillStyle = colors.primary;
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.font = `800 ${tile * 0.6}px ${family("display")}`;
-    c.fillText(ad.brand.trim().charAt(0).toUpperCase(), W / 2, y + tile * 0.54);
+  const pad = Math.min(W, H) * 0.12;
+  const name = ad.brand.trim();
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillStyle = ink;
+  if (logo && logo.width / logo.height > 2.2) {
+    contain(c, logo, pad, pad, W - pad * 2, H - pad * 2);
+    return;
   }
-  c.strokeStyle = colors.secondary;
-  c.lineWidth = Math.min(W, H) * 0.04;
-  c.strokeRect(
-    c.lineWidth / 2,
-    c.lineWidth / 2,
-    W - c.lineWidth,
-    H - c.lineWidth,
-  );
+  const symbol = (x: number, y: number, size: number) =>
+    logo ? contain(c, logo, x, y, size, size) : emblem(c, ad, x, y, size);
+  if (W / H >= 2.6) {
+    // Very wide: symbol on the left, the name filling the rest.
+    const size = H - pad * 2;
+    symbol(pad, pad, size);
+    const left = pad * 2 + size,
+      room = W - left - pad;
+    const font = fit(c, name, room, Math.round(H * 0.5), 18, "800");
+    c.textAlign = "left";
+    c.fillStyle = ink;
+    c.font = `800 ${font}px ${family("display")}`;
+    c.fillText(name, left, H / 2 + font * 0.04);
+  } else {
+    // Otherwise the symbol on top and the name below it, across the full width.
+    const size = Math.min(W - pad * 2, H * 0.5);
+    symbol((W - size) / 2, pad * 0.9, size);
+    const room = H - pad * 1.6 - size;
+    const font = fit(c, name, W - pad * 1.2, Math.round(room * 0.8), 16, "800");
+    c.fillStyle = ink;
+    c.font = `800 ${font}px ${family("display")}`;
+    c.fillText(name, W / 2, pad * 0.9 + size + room / 2 + font * 0.04);
+  }
 }
+const luminance = (hex: string) => {
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
+  return (
+    (0.2126 * ((n >> 16) & 255) +
+      0.7152 * ((n >> 8) & 255) +
+      0.0722 * (n & 255)) /
+    255
+  );
+};

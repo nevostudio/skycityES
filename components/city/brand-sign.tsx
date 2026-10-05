@@ -119,24 +119,34 @@ const groundVolume = (m: Massing) =>
     .reduce((a, b) => (b.w * b.d > a.w * a.d ? b : a));
 
 /**
- * The brand's main support: a physical sign with posts standing on the crown of the top
- * volume. Its frame takes the brand colour; size follows the tier and the room left by
- * neighbours.
+ * Complementary rooftop sign with posts on the crown of the top volume. The facade carries
+ * the brand; this sign is compact and only stands on some silhouettes.
  */
 export function RooftopSign({
   p,
   tier,
   palette,
   maxWidth,
+  compact = false,
 }: {
   p: PublicProperty & { ad: Ad };
   tier: BuildingTier;
   palette: BrandPalette;
   maxWidth?: number;
+  /** Secondary sign next to a strong facade: smaller and lower. */
+  compact?: boolean;
 }) {
   const m = massing(p);
   const top = dims(m.top, p);
-  const size = signSize(tier, top.w, maxWidth);
+  const full = signSize(tier, top.w, maxWidth);
+  const k = compact ? 0.62 : 1;
+  const size = {
+    ...full,
+    width: full.width * k,
+    height: full.height * k,
+    lift: full.lift * k,
+    pixels: compact ? Math.min(full.pixels, 512) : full.pixels,
+  };
   const px = size.pixels;
   const texture = useCanvasTexture(
     `roof:${px}:${size.width.toFixed(2)}:${size.lit}:${contentKey(p.ad)}`,
@@ -190,43 +200,6 @@ export function RooftopSign({
   );
 }
 
-/** Casco Antiguo: the main sign hangs on the facade, above the ground floor. */
-function FacadeSign({
-  p,
-  palette,
-}: {
-  p: PublicProperty & { ad: Ad };
-  palette: BrandPalette;
-}) {
-  const g = dims(groundVolume(massing(p)), p);
-  const width = Math.min(g.w * 0.86, 3),
-    height = width * 0.34;
-  const texture = useCanvasTexture(
-    `facade:${width.toFixed(2)}:${contentKey(p.ad)}`,
-    768,
-    (768 * height) / width,
-    (canvas, update) =>
-      paintBrand(p.ad, (logo) => drawRooftopSign(canvas, p.ad, logo), update),
-  );
-  return (
-    <group
-      name={`facade-sign-${p.id}`}
-      position={[g.x, 2.45, g.z + g.d / 2 + 0.09]}
-    >
-      <mesh castShadow>
-        <boxGeometry args={[width + 0.14, height + 0.14, 0.08]} />
-        <meshStandardMaterial color={palette.primary} roughness={0.6} />
-      </mesh>
-      {texture && (
-        <mesh position={[0, 0, 0.045]}>
-          <planeGeometry args={[width, height]} />
-          <meshBasicMaterial map={texture} toneMapped={false} />
-        </mesh>
-      )}
-    </group>
-  );
-}
-
 /**
  * Dominant brand panel on a facade: the advertising image, or the logo large on the brand
  * colour, framed in the contrasting neutral. Front panels face the street; side panels
@@ -238,8 +211,13 @@ function BrandPanel({
   v,
   side,
   share,
+  ratio,
+  cap,
   screen = false,
   image = false,
+  low,
+  roofless,
+  offset = 0,
 }: {
   p: PublicProperty & { ad: Ad };
   palette: BrandPalette;
@@ -247,16 +225,27 @@ function BrandPanel({
   side: boolean;
   /** Share of the facade width it covers. */
   share: number;
+  /** Height / width of the panel. */
+  ratio: number;
+  /** Maximum height. */
+  cap: number;
   screen?: boolean;
   image?: boolean;
+  /** Lowest point it may reach (keeps shopfront details clear). */
+  low: number;
+  /** Pitched roofs: the panel must stay below the eaves. */
+  roofless: boolean;
+  /** Sideways shift, as a share of the face width (leaves room for a vertical band). */
+  offset?: number;
 }) {
   const b = dims(v, p);
   const faceW = side ? b.d : b.w;
-  const floorFrom = Math.max(b.y0, 2.15);
-  const span = b.y1 - floorFrom - 0.35;
+  const lo = Math.max(b.y0, low);
+  const span = b.y1 - 0.3 - lo;
   const width = faceW * share;
-  const height = Math.min(span, width * (side ? 1.5 : 0.78), side ? 6 : 3.2);
-  const ok = span >= 0.8 && height >= 0.8;
+  // Low buildings let the panel rise above the roof line like a shop fascia.
+  const height = Math.min(width * ratio, cap, span + (roofless ? 0 : 0.85));
+  const ok = height >= 0.6;
   const pxW = width >= height ? 768 : Math.round((768 * width) / height);
   const pxH = width >= height ? Math.round((768 * height) / width) : 768;
   const texture = useCanvasTexture(
@@ -277,19 +266,22 @@ function BrandPanel({
       ),
   );
   if (!ok) return null;
-  const y = b.y1 - 0.35 - height / 2;
+  const top = Math.max(b.y1 - 0.3, lo + height);
+  const y = top - height / 2;
   return (
     <group
       name={`brand-panel-${side ? "side" : "front"}-${p.id}`}
       position={
-        side ? [b.x + b.w / 2 + 0.07, y, b.z] : [b.x, y, b.z + b.d / 2 + 0.07]
+        side
+          ? [b.x + b.w / 2 + 0.07, y, b.z - offset * faceW]
+          : [b.x + offset * faceW, y, b.z + b.d / 2 + 0.07]
       }
       rotation={[0, side ? Math.PI / 2 : 0, 0]}
     >
       <mesh position={[0, 0, -0.04]} castShadow>
-        <boxGeometry args={[width + 0.18, height + 0.18, 0.08]} />
+        <boxGeometry args={[width + 0.14, height + 0.14, 0.08]} />
         <meshStandardMaterial
-          color={screen ? "#20292b" : palette.secondary}
+          color={screen ? "#20292b" : palette.deep}
           roughness={0.55}
         />
       </mesh>
@@ -349,52 +341,10 @@ function VerticalBanner({
   );
 }
 
-/** PLUS front detail: awning over the shopfront (striped in Casco Antiguo). */
-function Awning({
-  p,
-  palette,
-  striped,
-}: {
-  p: PublicProperty;
-  palette: BrandPalette;
-  striped: boolean;
-}) {
-  const g = dims(groundVolume(massing(p)), p);
-  const width = g.w * 0.88;
-  const stripes = striped ? 7 : 1;
-  return (
-    <group
-      name={`awning-${p.id}`}
-      position={[g.x, 1.92, g.z + g.d / 2 + 0.4]}
-      rotation={[0.38, 0, 0]}
-    >
-      {Array.from({ length: stripes }, (_, i) => (
-        <mesh
-          key={i}
-          position={[-width / 2 + (width / stripes) * (i + 0.5), 0, 0]}
-          castShadow
-        >
-          <boxGeometry args={[width / stripes, 0.07, 0.9]} />
-          <meshStandardMaterial
-            color={striped && i % 2 ? palette.secondary : palette.primary}
-            roughness={0.8}
-          />
-        </mesh>
-      ))}
-      <mesh position={[0, -0.05, 0.46]}>
-        <boxGeometry args={[width + 0.02, 0.16, 0.05]} />
-        <meshStandardMaterial color={palette.secondary} />
-      </mesh>
-    </group>
-  );
-}
-
 /**
- * Brand identity of a building. Every tier adds supports on top of the coloured
- * architecture (see BuildingForm):
- * STARTER: sign · PLUS: sign + front detail · PRO: sign + front panel ·
- * PREMIUM: sign + large front or side panel · LANDMARK: lit sign, vertical banner and panels.
- * Billboard and facade patterns get their dominant panel from PLUS up.
+ * Brand identity of a building, on top of the brand-coloured architecture (see
+ * BuildingForm). The logo or image is built into the facade so it reads from the city
+ * overview; rooftop signs only complement some silhouettes.
  */
 export function BrandSign({
   p,
@@ -413,7 +363,6 @@ export function BrandSign({
   const level = presenceLevel(tier);
   const m = massing(p);
   const arch = architectureOf(p.districtId);
-  const curated = kind !== "custom";
   const t = dims(m.top, p);
   const g = dims(groundVolume(m), p);
   const h = p.height;
@@ -423,27 +372,40 @@ export function BrandSign({
   // The tallest volume that rises above the ground floor carries the panels.
   const panelVolume =
     m.volumes
-      .filter((v) => v.y1 - Math.max(v.y0, 2.15) >= 1)
+      .filter((v) => v.y1 - Math.max(v.y0, 1.95) >= 1)
       .sort((a, b) => b.y1 - b.y0 - (a.y1 - a.y0))[0] ?? m.top;
   const banner = !!p.ad.banner;
   const wantsSide = banner && p.ad.support === "SIDE_BILLBOARD";
-  const dominant = m.pattern === "facade" || m.pattern === "billboard";
-  const front =
-    level >= 2 ||
-    (level === 1 && dominant) ||
-    (banner && level >= 1 && !wantsSide);
+  const roofless = m.roof === "gable";
+  // The facade carries the brand. Panel per tier (share of the face, height/width, cap):
+  // STARTER a small logo plate, PLUS a visible front panel, PRO a clear front panel with an
+  // optional side one, PREMIUM a large front plus side panel or vertical band, LANDMARK all.
+  const FRONT: [number, number, number][] = [
+    [0.64, 0.5, 1.2],
+    [0.82, 0.52, 1.7],
+    [0.88, 0.62, 2.4],
+    [0.9, 0.86, 3.6],
+    [0.92, 0.9, 4.4],
+    [0.92, 0.9, 4.4],
+  ];
+  const [share, ratio, cap] = FRONT[Math.min(level, 5)];
   const side =
     level >= 4 ||
-    (level === 3 && m.variant % 2 === 1) ||
-    (wantsSide && level >= 1);
-  const frontShare =
-    m.pattern === "billboard"
-      ? 0.88
-      : m.pattern === "facade"
-        ? 0.8
-        : level >= 3
-          ? 0.72
-          : 0.6;
+    (level === 3 && (m.variant % 2 === 1 || wantsSide)) ||
+    (level === 2 && (m.variant % 2 === 1 || wantsSide));
+  const band = level >= 4 || (level === 3 && !side);
+  // The rooftop sign is a complement: only on rooftop/wrapped silhouettes, compact, and
+  // always on landmarks as their lit crown.
+  const rooftop =
+    !roofless &&
+    (level >= 4 || m.pattern === "rooftop" || m.pattern === "wrapped");
+  const panel = {
+    p,
+    palette,
+    v: panelVolume,
+    low: roofless ? 1 : 1.95,
+    roofless,
+  };
   useFrame((_, delta) => {
     if (!motion || !neon.current) return;
     time.current += Math.min(delta, 0.05);
@@ -451,41 +413,36 @@ export function BrandSign({
   });
   return (
     <group name={"branding-" + p.id}>
-      {m.roof === "gable" ? (
-        <FacadeSign p={p} palette={palette} />
-      ) : (
+      {rooftop && (
         <RooftopSign
           p={p}
           tier={tier}
           palette={palette}
           maxWidth={maxSignWidth}
+          compact={level < 4}
         />
       )}
-      {front && !(curated && level < 3) && (
-        <BrandPanel
-          p={p}
-          palette={palette}
-          v={panelVolume}
-          side={false}
-          share={frontShare}
-          screen={arch === "leisure"}
-          image={banner && !wantsSide}
-        />
-      )}
+      <BrandPanel
+        {...panel}
+        side={false}
+        share={band ? Math.min(share, 0.64) : share}
+        offset={band ? 0.15 : 0}
+        ratio={banner && !wantsSide ? Math.min(ratio, 0.56) : ratio}
+        cap={cap}
+        screen={arch === "leisure"}
+        image={banner && !wantsSide}
+      />
       {side && (
         <BrandPanel
-          p={p}
-          palette={palette}
-          v={panelVolume}
+          {...panel}
           side
-          share={level >= 4 ? 0.7 : 0.62}
+          share={level >= 4 ? 0.82 : 0.74}
+          ratio={level >= 3 ? 1.6 : 1}
+          cap={level >= 4 ? 7 : level === 3 ? 5 : 2.6}
           image={wantsSide}
         />
       )}
-      {level >= 4 && <VerticalBanner p={p} palette={palette} />}
-      {level === 1 && !dominant && !curated && (
-        <Awning p={p} palette={palette} striped={arch === "historic"} />
-      )}
+      {band && <VerticalBanner p={p} palette={palette} />}
       {cafe && (
         <>
           <Piece

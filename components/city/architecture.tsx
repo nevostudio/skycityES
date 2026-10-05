@@ -67,25 +67,19 @@ export function BuildingForm({
       if (v.role === "base" && level >= 4) return STONE;
       return v.role !== "base" && m.glassTop ? glass : wall;
     }
-    const base = v.role === "base";
-    switch (m.pattern) {
-      case "rooftop":
-        return base ? brand.secondary : brand.primary;
-      case "wrapped":
-        return base ? STONE : brand.primary;
-      case "billboard":
-        return base ? brand.deep : brand.tint;
-      case "facade":
-        return base ? brand.deep : m.glassTop ? glass : wall;
-    }
+    // Owned buildings are painted almost entirely in the brand colour; only a multi-volume
+    // base drops to the darker brand tone, so the body still reads as one brand mass.
+    return v.role === "base" && m.volumes.length > 1
+      ? brand.deep
+      : brand.primary;
   };
-  const accent = muted ? MUTED : brand ? brand.secondary : district.trim;
+  const accent = muted ? MUTED : brand ? brand.deep : district.trim;
   const crownColor = muted
     ? MUTED
     : brand
-      ? m.crown === "cap" || m.pattern === "facade"
+      ? m.crown === "cap"
         ? brand.primary
-        : brand.secondary
+        : brand.deep
       : m.roof === "green"
         ? "#a9c68f"
         : district.roof;
@@ -159,11 +153,11 @@ export function BuildingForm({
                 tz + sz * (td / 2),
               ]}
               scale={[0.12, t.y1 - t.y0, 0.12]}
-              color={brand.secondary}
+              color={brand.deep}
             />
           )),
         )}
-      {/* Facade pattern: brand-coloured corner pilasters frame the neutral body. */}
+      {/* Facade pattern: darker corner pilasters give the brand body a frame. */}
       {brand &&
         !muted &&
         m.pattern === "facade" &&
@@ -179,7 +173,7 @@ export function BuildingForm({
                   v.z * d + (v.d * d) / 2 - 0.09,
                 ]}
                 scale={[0.26, v.y1 - v.y0, 0.26]}
-                color={brand.primary}
+                color={brand.deep}
               />
             )),
           )}

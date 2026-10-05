@@ -227,7 +227,8 @@ export function saturate(hex: string, amount = 1.18) {
     h /= 6;
   }
   s = Math.min(1, s * amount);
-  const L = Math.min(0.66, Math.max(0.2, l));
+  // Neutral light brands (white) stay near-white; coloured ones keep enough depth to read.
+  const L = Math.min(s < 0.08 ? 0.92 : 0.66, Math.max(0.2, l));
   const q = L < 0.5 ? L * (1 + s) : L + s - L * s,
     pp = 2 * L - q;
   const hue = (t: number) => {
@@ -256,30 +257,22 @@ export type BrandPalette = {
   /** Window glass that reads on the brand colour. */
   window: string;
 };
-/** How a brand colours its building (curated demo brands keep their own palettes). */
+/** How a brand colours its building. */
 export function brandPalette(ad: Ad): BrandPalette {
-  const curated = brandKind(ad) !== "custom";
-  const theme = brandTheme(ad);
-  let primary: string, secondary: string;
-  if (curated) {
-    const lightBg = luminance(toHex(toRgb(normalize(theme.background)))) > 0.55;
-    primary = normalize(lightBg ? theme.accent : theme.background);
-    secondary = normalize(lightBg ? theme.background : theme.accent);
-  } else {
-    primary = saturate(ad.primary);
-    const own = /^#[0-9a-f]{6}$/i.test(ad.secondary) ? ad.secondary : "#fcf5e9";
-    secondary =
-      Math.abs(luminance(own) - luminance(primary)) > 0.3
-        ? own
-        : luminance(primary) > 0.4
-          ? "#17322a"
-          : "#f3eee3";
-  }
+  // The building wears the brand's own primary colour, the one its logo and panel use.
+  const primary = saturate(normalize(ad.primary));
+  const own = /^#[0-9a-f]{6}$/i.test(ad.secondary) ? ad.secondary : "#fcf5e9";
+  const secondary =
+    Math.abs(luminance(own) - luminance(primary)) > 0.3
+      ? own
+      : luminance(primary) > 0.4
+        ? "#17322a"
+        : "#f3eee3";
   const lum = luminance(primary);
   return {
     primary,
     secondary,
-    deep: toHex(toRgb(primary).map((v) => v * 0.62)),
+    deep: toHex(toRgb(primary).map((v) => v * (lum > 0.8 ? 0.8 : 0.62))),
     tint: toHex(
       toRgb(primary).map((v, i) => v + ([243, 239, 229][i] - v) * 0.24),
     ),
