@@ -512,42 +512,6 @@ h3 {
   overflow: hidden;
   background: #e7e9df;
 }
-.map-toolbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  background: #fbfcf8f5;
-  display: flex;
-  align-items: center;
-  padding: 0 17px;
-  gap: 20px;
-  z-index: 3;
-  border-bottom: 1px solid #dfe4d7;
-}
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0 !important;
-  flex: 1;
-  color: #8a9583;
-  min-width: 160px;
-}
-.search-box input {
-  padding: 0;
-  border: 0 !important;
-  margin-top: 0;
-  background: transparent !important;
-  font-size: 10px !important;
-  min-height: auto !important;
-  box-shadow: none;
-  outline: none !important;
-  flex: 1;
-  min-width: 0;
-  color: var(--ink);
-}
 .duration-fieldset {
   border: 0;
   padding: 0;
@@ -558,46 +522,6 @@ h3 {
   font-size: 11px;
   font-weight: 500;
   padding: 0;
-}
-.search-box kbd {
-  font-size: 11px;
-  border: 1px solid #e2e5dc;
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: #a4ab9d;
-}
-.quick-filters {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-.quick-filters button {
-  padding: 7px 11px;
-  font-size: 9px;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 5px;
-  color: #91998b;
-}
-.quick-filters button.active {
-  background: #e9eee3;
-  color: #445b40;
-}
-.filter-select {
-  margin: 0 !important;
-  display: flex;
-  position: relative;
-  border-left: 1px solid var(--line);
-  padding-left: 12px;
-}
-.filter-select select {
-  width: 23px !important;
-  opacity: 0;
-  position: absolute;
-  inset: 0;
-  cursor: pointer;
 }
 .map-canvas {
   position: absolute;
@@ -2037,20 +1961,6 @@ td small {
     margin-left: 10px;
     gap: 25px;
   }
-  .map-toolbar {
-    gap: 10px;
-    padding: 0 12px;
-  }
-  .quick-filters button {
-    padding: 6px 7px;
-    font-size: 8px;
-  }
-  .search-box input {
-    font-size: 9px !important;
-  }
-  .search-box kbd {
-    display: none;
-  }
   .featured-grid {
     gap: 11px;
   }
@@ -2134,10 +2044,6 @@ td small {
   }
   .intro p {
     font-size: 10px;
-  }
-  .quick-filters button:nth-child(3),
-  .quick-filters button:nth-child(4) {
-    display: none;
   }
   .map-shell {
     height: 520px;
@@ -2307,26 +2213,6 @@ td small {
   .map-shell {
     height: 570px;
     overflow: hidden;
-  }
-  .map-toolbar {
-    height: 51px;
-    gap: 8px;
-    padding: 0 11px;
-  }
-  .search-box {
-    min-width: 120px;
-    gap: 6px;
-  }
-  .search-box input {
-    font-size: 8px !important;
-  }
-  .quick-filters {
-    display: none;
-  }
-  .filter-select {
-    padding: 0;
-    border: 0;
-    width: 20px;
   }
   .map-canvas {
     inset: 51px 0 0;

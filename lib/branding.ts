@@ -45,14 +45,18 @@ export type SignSpec = {
   pixels: number;
   lit: boolean;
 };
-/** Clear progression: STARTER small → LANDMARK large and lit. Skyscrapers get the largest. */
+/**
+ * Clear progression from a readable base sign to a city-scale landmark sign. These are
+ * deliberately broad: the facade does the primary branding work, while the roof sign acts as
+ * a large second read above the skyline.
+ */
 export const ROOFTOP_SIGN: Record<BuildingTier, SignSpec> = {
-  STARTER: { width: 2.2, height: 0.86, lift: 0.35, pixels: 640, lit: false },
-  PLUS: { width: 2.8, height: 1.06, lift: 0.45, pixels: 768, lit: false },
-  PRO: { width: 3.4, height: 1.3, lift: 0.55, pixels: 1024, lit: false },
-  PREMIUM: { width: 4, height: 1.6, lift: 0.65, pixels: 1024, lit: false },
-  LANDMARK: { width: 4.6, height: 1.95, lift: 0.8, pixels: 1024, lit: true },
-  SKYSCRAPER: { width: 5.2, height: 2.2, lift: 0.95, pixels: 1024, lit: true },
+  STARTER: { width: 2.8, height: 1.12, lift: 0.28, pixels: 768, lit: false },
+  PLUS: { width: 3.35, height: 1.38, lift: 0.32, pixels: 896, lit: false },
+  PRO: { width: 3.9, height: 1.68, lift: 0.36, pixels: 1024, lit: false },
+  PREMIUM: { width: 4.55, height: 2.05, lift: 0.42, pixels: 1280, lit: true },
+  LANDMARK: { width: 5.2, height: 2.45, lift: 0.5, pixels: 1280, lit: true },
+  SKYSCRAPER: { width: 6, height: 2.8, lift: 0.58, pixels: 1536, lit: true },
 };
 /**
  * Rooftop signs turn towards the city's default viewpoint (the camera's azimuth), so names
@@ -60,7 +64,7 @@ export const ROOFTOP_SIGN: Record<BuildingTier, SignSpec> = {
  */
 export const SIGN_YAW = 0.55;
 /** Signs never exceed this much of the roof width, nor the room left by neighbours. */
-export const SIGN_ROOF_RATIO = 1.55;
+export const SIGN_ROOF_RATIO = 1.85;
 export function signSize(
   tier: BuildingTier,
   roofWidth: number,

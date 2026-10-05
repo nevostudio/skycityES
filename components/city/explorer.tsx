@@ -1,9 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Search,
   ArrowUpRight,
-  SlidersHorizontal,
   Plus,
   Minus,
   Maximize,
@@ -20,6 +18,8 @@ import Link from "next/link";
 import type { BuildingTier, CityData, Lease, PublicProperty } from "@/types";
 import { useCity } from "@/hooks/use-city";
 import { Header } from "../header";
+import { TopBrands } from "./top-brands";
+import { cityMetrics } from "@/lib/city-social";
 import { DistrictSidebar } from "./district-sidebar";
 import CityScene from "./city-loader";
 import type { Construction } from "./building";
@@ -29,26 +29,6 @@ import { ShareModal } from "../property/share-modal";
 import { api, districtName, euro, statusLabel } from "@/lib/client";
 import { buildingHeight } from "@/lib/presence";
 import { track } from "@/lib/analytics/client";
-const filters = [
-  "Todos",
-  "Disponibles",
-  "Construidos",
-  "Subastas",
-  "Públicos",
-  "Premium",
-  "Destacados",
-];
-const quickFilters: Record<string, string> = {
-  Todos: "Todo",
-  Disponibles: "Solares libres",
-  Construidos: "Construidos",
-  Subastas: "Subastas",
-};
-const dotClass: Record<string, string> = {
-  Disponibles: "available",
-  Construidos: "claimed",
-  Subastas: "auction",
-};
 const activityLabel: Record<string, string> = {
   claimed: "ha construido en",
   upgraded: "ha hecho crecer",
@@ -70,7 +50,6 @@ export function Explorer({
   initialProperty?: string;
 }) {
   const { data, refresh, error } = useCity(initial);
-  const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("Todos");
   const [district, setDistrict] = useState("all");
   const [selected, setSelected] = useState<string | null>(
@@ -84,7 +63,6 @@ export function Explorer({
   const [reset, setReset] = useState(0);
   const [list, setList] = useState(false);
   const [sidebar, setSidebar] = useState(false);
-  const [introHidden, setIntroHidden] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [owned, setOwned] = useState<Owned[]>([]);
   const [constructing, setConstructing] = useState<
@@ -92,7 +70,6 @@ export function Explorer({
   >({});
   const shareAfterBuild = useRef<string | null>(null);
   const previous = useRef<Map<string, BuildingTier | undefined> | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
   const loadOwned = useCallback(async () => {
     try {
       const me = await api<{ leases?: Owned[] }>("/api/me");
@@ -151,31 +128,19 @@ export function Explorer({
     const q = new URLSearchParams(location.search);
     if (q.get("building")) {
       setSelected(q.get("building"));
-      setIntroHidden(true);
     }
     if (q.has("available")) {
       setFilter("Disponibles");
       setList(true);
-      setIntroHidden(true);
     }
     if (q.has("district")) {
       setDistrict(q.get("district")!);
-      setIntroHidden(true);
     }
     track("city_impression");
     function keyboard(e: KeyboardEvent) {
-      if (
-        e.key === "/" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
       if (e.key === "Escape" && !document.querySelector("[role=dialog]")) {
         setSidebar(false);
         setList(false);
-        setQuery("");
         setSelected(null);
       }
     }
@@ -185,9 +150,6 @@ export function Explorer({
   const matching = data.properties.filter(
     (p) =>
       (district === "all" || p.districtId === district) &&
-      `${p.name} ${p.number} ${districtName(p.districtId, data.districts)} ${p.ad?.brand || ""}`
-        .toLowerCase()
-        .includes(query.toLowerCase()) &&
       (filter === "Todos" ||
         (filter === "Disponibles" && p.status === "available") ||
         (filter === "Construidos" && !!p.building) ||
@@ -206,10 +168,8 @@ export function Explorer({
   const focused = data.districts.find((d) => d.id === district) || null;
   const choose = useCallback((p: PublicProperty) => {
     setSelected(p.id);
-    setIntroHidden(true);
     setSidebar(false);
     setList(false);
-    setQuery("");
     track("property_open", p.id);
     track("property_impression", p.id);
   }, []);
@@ -237,10 +197,14 @@ export function Explorer({
       setShare(true);
     }
   }
-  const showIntro = !introHidden && !p && !query && !list;
   return (
-    <div className="app immersive-app">
-      <Header demo={data.demo} onClaim={findSpot} />
+    <div className="app immersive-app social-city">
+      <Header
+        demo={data.demo}
+        onClaim={findSpot}
+        metrics={cityMetrics(data)}
+        nav={false}
+      />
       <main className="city-experience">
         <section
           className="map-shell"
@@ -261,96 +225,16 @@ export function Explorer({
               onBuilt={built}
             />
           </div>
-          {showIntro && (
-            <section className="world-intro">
-              <button
-                className="intro-dismiss icon-button"
-                aria-label="Ocultar introducción"
-                onClick={() => setIntroHidden(true)}
-              >
-                <X size={15} />
-              </button>
-              <div className="intro-kicker">
-                <span />
-                UNA CIUDAD POR CONSTRUIR
-              </div>
-              <h1>
-                Construye tu marca en el mapa<span>.</span>
-              </h1>
-              <p>
-                Elige un solar y levanta tu edificio desde{" "}
-                {euro(cheapest?.price ?? 3)}.
-              </p>
-              <button className="intro-claim" onClick={findSpot}>
-                Elegir mi solar <ArrowUpRight size={16} />
-              </button>
-              <ul className="intro-legend" aria-label="Leyenda del mapa">
-                <li>
-                  <i className="legend-brand" />
-                  {data.stats.privateBuilt} marcas ya han construido
-                </li>
-                <li>
-                  <i className="legend-plot" />
-                  {data.stats.available} solares libres desde{" "}
-                  {euro(cheapest?.price ?? 3)}
-                </li>
-              </ul>
-              <small>Pago único, sin registro.</small>
-            </section>
-          )}
-          <div className="map-toolbar">
-            <div className="search-box">
-              <Search size={19} />
-              <input
-                ref={searchRef}
-                aria-label="Buscar en SkyCity"
-                placeholder="Busca solares, marcas, barrios…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              {query ? (
-                <button
-                  aria-label="Borrar búsqueda"
-                  onClick={() => setQuery("")}
-                >
-                  <X size={15} />
-                </button>
-              ) : (
-                <kbd>/</kbd>
-              )}
-            </div>
-            <div className="quick-filters">
-              {Object.entries(quickFilters).map(([f, label]) => (
-                <button
-                  key={f}
-                  aria-pressed={filter === f}
-                  className={filter === f ? "active" : ""}
-                  onClick={() => {
-                    setFilter(f);
-                    setIntroHidden(true);
-                  }}
-                >
-                  {dotClass[f] && <i className={`status-dot ${dotClass[f]}`} />}{" "}
-                  {label}
-                </button>
-              ))}
-            </div>
-            <label className="filter-select" title="Más filtros">
-              <SlidersHorizontal size={17} />
-              <select
-                aria-label="Filtrar solares"
-                value={filter}
-                onChange={(e) => {
-                  setFilter(e.target.value);
-                  setIntroHidden(true);
-                }}
-              >
-                {filters.map((f) => (
-                  <option key={f}>{f}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <TopBrands
+            hidden={list}
+            data={data}
+            selected={selected}
+            onSelect={(property) => {
+              setFilter("Todos");
+              setDistrict("all");
+              choose(property);
+            }}
+          />
           <div className="world-district-control">
             <button
               className={`district-trigger ${sidebar ? "active" : ""}`}
@@ -377,13 +261,12 @@ export function Explorer({
               setDistrict={(value) => {
                 setDistrict(value);
                 setSelected(null);
-                setIntroHidden(true);
               }}
               sidebar={sidebar}
               setSidebar={setSidebar}
             />
           </div>
-          {(list || query) && (
+          {list && (
             <section
               className="directory world-directory"
               aria-label="Directorio de solares"
@@ -403,7 +286,6 @@ export function Explorer({
                   aria-label="Cerrar directorio"
                   onClick={() => {
                     setList(false);
-                    setQuery("");
                   }}
                 >
                   <X size={17} />
@@ -434,7 +316,7 @@ export function Explorer({
               )}
               {matching.length > 60 && (
                 <p className="microcopy">
-                  Mostrando 60 ubicaciones. Busca para afinar.
+                  Mostrando 60 ubicaciones. Elige un barrio para afinar.
                 </p>
               )}
             </section>
@@ -476,7 +358,6 @@ export function Explorer({
                 onClick={() => {
                   setFilter("Subastas");
                   setList(true);
-                  setIntroHidden(true);
                 }}
               >
                 <i className="status-dot auction" />
@@ -573,7 +454,6 @@ export function Explorer({
               onClick={() => {
                 setList(!list);
                 setSidebar(false);
-                setIntroHidden(true);
               }}
               aria-label={list ? "Ocultar directorio" : "Directorio de solares"}
             >

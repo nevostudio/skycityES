@@ -4,6 +4,7 @@ import { appUrl } from "@/lib/config";
 import "./globals.css";
 import "./immersive.css";
 import "./redesign.css";
+import "./city-social.css";
 
 // Self-hosted at build time: no request reaches Google from the visitor's browser.
 const display = Bricolage_Grotesque({

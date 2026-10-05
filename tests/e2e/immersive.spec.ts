@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("fullscreen city: plots, brands, focus, neighborhoods, filters and navigation", async ({
+test("fullscreen city: plots, brands, focus, neighborhoods, directory and pages", async ({
   page,
+  request,
 }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   const errors: string[] = [];
@@ -20,16 +21,23 @@ test("fullscreen city: plots, brands, focus, neighborhoods, filters and navigati
   const canvas = await page.locator("canvas").boundingBox();
   // The city takes the whole viewport: navigation floats over it.
   expect(canvas?.height).toBe(1080);
-  await page.getByRole("button", { name: "Ocultar introducción" }).click();
+  // The top is only logo, metrics and the build CTA: no section links, no search bar.
+  await expect(
+    page.getByRole("navigation", { name: "Navegación principal" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", { name: "Buscar en SkyCity" }),
+  ).toHaveCount(0);
+  await expect(page.locator(".map-toolbar")).toHaveCount(0);
+  await page.getByRole("button", { name: "Cerrar Top marcas" }).click();
   await expect(page.locator(".brand-pin, .available-pin")).toHaveCount(0);
-  await page
-    .getByRole("textbox", { name: "Buscar en SkyCity" })
-    .fill("Nova Labs");
-  await page
-    .locator(".directory-grid button")
-    .filter({ hasText: "Nova Labs" })
-    .first()
-    .click();
+  const nova = (await (await request.get("/api/city")).json()).properties.find(
+    (v: { ad?: { brand: string } }) => v.ad?.brand === "Nova Labs",
+  );
+  await page.goto(`/?building=${nova.id}`);
+  await expect
+    .poll(async () => (await page.locator("canvas").boundingBox())?.width)
+    .toBe(1920);
   const panel = page.getByRole("complementary", {
     name: "Solar seleccionado",
   });
@@ -48,20 +56,17 @@ test("fullscreen city: plots, brands, focus, neighborhoods, filters and navigati
   ).toContainText("Casco Antiguo");
   await page.getByRole("button", { name: "Restablecer cámara" }).click();
   await page
-    .getByRole("button", { name: "Solares libres", exact: true })
-    .click();
-  await page
     .getByRole("button", { name: "Directorio de solares", exact: true })
     .click();
   await expect(
     page.getByRole("region", { name: "Directorio de solares" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Cerrar directorio" }).click();
-  await page.getByRole("link", { name: "Subastas", exact: true }).click();
-  await expect(page).toHaveURL(/\/auctions$/);
+  // Auctions and My buildings stay available as pages, with their own navigation.
+  await page.goto("/auctions");
   await page.getByRole("link", { name: "Explorar", exact: true }).click();
   await expect(page.locator("canvas")).toBeVisible();
-  await page.getByRole("link", { name: "Mis edificios", exact: true }).click();
+  await page.goto("/my-buildings");
   await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -218,6 +218,13 @@ export function citySnapshot(
   const standing = new Set(built.map((p) => p.id));
   return {
     demo,
+    metrics: {
+      totalVisits: s.analytics
+        .filter((e) => e.event === "city_impression" && !e.propertyId)
+        .reduce((total, e) => total + e.count, 0),
+      online: null,
+      onlineSource: "unavailable",
+    },
     properties,
     districts: s.districts,
     // Retired seed showcases no longer stand in the city.

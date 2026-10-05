@@ -26,7 +26,7 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 - La home abre sobre un **escaparate curado** (`lib/showcase.ts`): la primera línea del Centro frente al bulevar, unas 15–25 parcelas a 1920×1080, con HQ y la Torre Central como skyline. El resto de la ciudad sigue disponible con arrastre y zoom; «Restablecer cámara» vuelve al escaparate.
 - El bulevar (entre Centro y Zona Residencial) tiene calzadas más anchas, mediana arbolada y farolas dobles.
 - En ciudades nuevas, NevoStudio, Pixel Coffee, Moonlight Club y Green Market están en primera línea, con Nova Labs detrás. Las alturas bajan hacia el lado de la cámara para que ningún edificio tape el cartel de otro, y hay solares libres entre ellos. Las ciudades existentes no mueven ningún edificio.
-- Jerarquía visual: edificios con marca (tinte de su color, contorno, pilastra de acento y cartel grande) → edificios públicos y premium → calles → solares libres. Los solares son discretos y solo destacan al pasar el ratón o con el filtro «Solares libres».
+- Jerarquía visual: edificios con marca (tinte de su color, contorno, pilastra de acento y cartel grande) → edificios públicos y premium → calles → solares libres. Los solares son discretos y solo destacan al pasar el ratón o al buscar solar libre («Construir desde 3 €»).
 
 ## Marca y carteles de azotea (fase 2)
 
@@ -41,8 +41,8 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 ## Rediseño visual (PDF «Rediseño visual de SkyCity»)
 
 - Sistema visual: tinta `#17322A`, crema `#FBF8F1`, arena `#F3EEE3`, naranja `#E8663A` (solo selección, directo, pagos y acciones clave) y salvia `#7FA36F`. Bricolage Grotesque para títulos, cifras y carteles; Instrument Sans para la interfaz. Ambas se autoalojan con `next/font` (sin peticiones a Google desde el navegador). Los estilos nuevos viven en `app/redesign.css`, cargado al final.
-- Ciudad-diorama a pantalla completa con interfaz flotante: marca, buscador con filtros (Todo · Solares libres · Construidos · Subastas), navegación ligera y contadores discretos. Suelo crema, parques salvia, árboles pequeños, nombres de barrio pintados en la calle y parcelas premium con el volumen futuro en línea discontinua.
-- Jerarquía: edificios construidos → premium/públicos → infraestructura → solares. Los solares en reposo son casi invisibles; el «+» aparece al pasar el ratón o con el filtro «Solares libres».
+- Ciudad-diorama a pantalla completa con interfaz flotante mínima: arriba solo el logo, las métricas de ciudad, «Construir desde 3 €» y el selector de barrio; Top marcas, controles del mapa y contadores discretos. Subastas y Mis edificios siguen disponibles en `/auctions` y `/my-buildings`, sin acceso desde la portada. Suelo crema, parques salvia, árboles pequeños, nombres de barrio pintados en la calle y parcelas premium con el volumen futuro en línea discontinua.
+- Jerarquía: edificios construidos → premium/públicos → infraestructura → solares. Los solares en reposo son casi invisibles; el «+» aparece al pasar el ratón o al buscar solar libre (`/?available=1`).
 - Edificios (`lib/massing.ts`, `components/city/architecture.tsx`): STARTER/PLUS/PRO una caja; PREMIUM zócalo + cuerpo retranqueado; LANDMARK zócalo + torre de vidrio con remate de marca. Barrios: Centro comercial, Financiero vidrio con planta baja oscura, Tecnológico vidrio claro con franja de color, Ocio fachada de color con pantalla, Casco Antiguo tejado a dos aguas con cartel en fachada, Ribera cubierta verde.
 - Regla de marca: un elemento principal (cartel de azotea con postes, o en fachada en Casco Antiguo) y un secundario opcional según tier y barrio: imagen publicitaria, lona vertical, pantalla, franja o toldo.
 - Panel lateral de 408 px (`components/property/property-panel.tsx`): marca, «TIER · Barrio», visitas, valor actual, historial de valor en escalera con pagos reales (compra inicial y takeovers completados) y CTA «Hacerme con este edificio» con el mínimo real. En solares libres: precio, «CONSTRUIR AQUÍ» y vista previa de los cinco tiers. En móvil es una hoja inferior.
@@ -260,3 +260,11 @@ El modo demo no está pensado para el filesystem efímero de Vercel. `ALLOW_HOST
 - Optimizar consultas por entidad, sustituir límites en memoria, instrumentar observabilidad y revisar políticas comerciales/locales son pasos del lanzamiento público, no supuestos ya verificados.
 
 Documentación consultada: [Next.js](https://nextjs.org/docs/app), [React Three Fiber](https://r3f.docs.pmnd.rs/getting-started/introduction), [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [Supabase Storage](https://supabase.com/docs/guides/storage/uploads/standard-uploads), [Stripe Checkout](https://docs.stripe.com/api/checkout/sessions/create), [Stripe fulfillment](https://docs.stripe.com/checkout/fulfillment), [Resend](https://resend.com/docs/api-reference/emails/send-email).
+
+## Top marcas y métricas de ciudad
+
+El panel flotante usa `rankBrands` y `latestPurchase` (`lib/city-social.ts`): solo edificios privados con marca activa, compra confirmada y valor actual positivo. Ordena por `current_property_value`; los empates mantienen el orden de solar. La última compra procede de `valueHistory`, que incluye adquisiciones y takeovers completados, excluyendo mejoras, reembolsos y ejemplos sin pago. En demo las compras de prueba se identifican como tales.
+
+`CityData.metrics.totalVisits` suma los eventos `city_impression` registrados (una visita por sesión de 30 minutos según la analítica existente). No suma las visitas a edificios. El contador de personas en línea todavía no tiene proveedor: la UI muestra **18 · demo** únicamente en modo demo y **—** en live. Para conectar presencia real, proporcionar `online` y `onlineSource: "live"` en `CityData.metrics`; no requiere cambiar el componente.
+
+El ranking selecciona el edificio a través del flujo de cámara existente y abre su ficha a la derecha. Puede cerrarse y reabrirse; en móvil arranca cerrado y se abre como panel inferior. `tests/e2e/city-social.spec.ts` comprueba navegación y responsive sobre los datos disponibles, sin realizar compras.

@@ -30,10 +30,9 @@ const STONE = "#efe9de";
 
 /**
  * The building's form: a set of volumes (base, body, set-back top) with a crown, chosen per
- * tier variant. Branded buildings take their colour according to their pattern:
- * rooftop (body in brand colour), facade (neutral body, dominant front panel), billboard
- * (brand-tinted body) or wrapped (the tower in brand colour). Footprint and height stay those
- * of the plot.
+ * tier variant. An owned building wears its brand colour across its main mass; facade panels,
+ * bands and signs add the logo or campaign image without leaving a neutral white tower behind.
+ * Footprint and height stay those of the plot.
  */
 export function BuildingForm({
   p,
@@ -184,6 +183,31 @@ export function BuildingForm({
           scale={[Math.min(0.5, tw * 0.2), h - t.y0 + 0.6, 0.14]}
           color={brand.secondary}
         />
+      )}
+      {/* Broad vertical identity rails remain legible after logos stop resolving at distance. */}
+      {brand && !muted && level >= 2 && !m.core && (
+        <>
+          <Block
+            position={[tx - tw * 0.38, (t.y0 + t.y1) / 2, tz + td / 2 + 0.045]}
+            scale={[
+              Math.max(0.18, tw * (level >= 4 ? 0.12 : 0.08)),
+              t.y1 - t.y0,
+              0.09,
+            ]}
+            color={brand.secondary}
+          />
+          {level >= 3 && (
+            <Block
+              position={[
+                tx + tw / 2 + 0.045,
+                (t.y0 + t.y1) / 2,
+                tz - td * 0.36,
+              ]}
+              scale={[0.09, t.y1 - t.y0, Math.max(0.18, td * 0.12)]}
+              color={brand.secondary}
+            />
+          )}
+        </>
       )}
       {m.roof === "gable" ? (
         <mesh

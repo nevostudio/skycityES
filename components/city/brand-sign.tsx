@@ -120,33 +120,23 @@ const groundVolume = (m: Massing) =>
 
 /**
  * Complementary rooftop sign with posts on the crown of the top volume. The facade carries
- * the brand; this sign is compact and only stands on some silhouettes.
+ * the primary identity, but the roof sign stays large enough to read in the city overview.
  */
 export function RooftopSign({
   p,
   tier,
   palette,
   maxWidth,
-  compact = false,
 }: {
   p: PublicProperty & { ad: Ad };
   tier: BuildingTier;
   palette: BrandPalette;
   maxWidth?: number;
-  /** Secondary sign next to a strong facade: smaller and lower. */
-  compact?: boolean;
 }) {
   const m = massing(p);
   const top = dims(m.top, p);
   const full = signSize(tier, top.w, maxWidth);
-  const k = compact ? 0.62 : 1;
-  const size = {
-    ...full,
-    width: full.width * k,
-    height: full.height * k,
-    lift: full.lift * k,
-    pixels: compact ? Math.min(full.pixels, 512) : full.pixels,
-  };
+  const size = full;
   const px = size.pixels;
   const texture = useCanvasTexture(
     `roof:${px}:${size.width.toFixed(2)}:${size.lit}:${contentKey(p.ad)}`,
@@ -180,7 +170,7 @@ export function RooftopSign({
         </mesh>
       ))}
       <mesh position={[0, y, 0]} castShadow>
-        <boxGeometry args={[size.width + 0.14, size.height + 0.14, 0.1]} />
+        <boxGeometry args={[size.width + 0.06, size.height + 0.06, 0.08]} />
         <meshStandardMaterial color={palette.primary} roughness={0.5} />
       </mesh>
       {texture && (
@@ -299,14 +289,19 @@ function BrandPanel({
 function VerticalBanner({
   p,
   palette,
+  level,
 }: {
   p: PublicProperty & { ad: Ad };
   palette: BrandPalette;
+  level: number;
 }) {
   const t = dims(massing(p).top, p);
   const tower = t.y1 - Math.max(t.y0, 2.2);
-  const height = Math.min(Math.max(tower * 0.8, 2.2), 8),
-    width = Math.min(0.85, t.w * 0.26);
+  const height = Math.min(
+      Math.max(tower * (level >= 4 ? 0.92 : 0.84), 2.6),
+      level >= 4 ? 10 : 7,
+    ),
+    width = Math.min(level >= 4 ? 1.35 : 1.08, t.w * 0.36);
   const texture = useCanvasTexture(
     `banner:${height.toFixed(1)}:${width.toFixed(2)}:${contentKey(p.ad)}`,
     180,
@@ -378,27 +373,22 @@ export function BrandSign({
   const wantsSide = banner && p.ad.support === "SIDE_BILLBOARD";
   const roofless = m.roof === "gable";
   // The facade carries the brand. Panel per tier (share of the face, height/width, cap):
-  // STARTER a small logo plate, PLUS a visible front panel, PRO a clear front panel with an
-  // optional side one, PREMIUM a large front plus side panel or vertical band, LANDMARK all.
+  // STARTER already receives a readable integrated plate. Each paid step grows the surface;
+  // PREMIUM and LANDMARK use tall facade-scale compositions that survive the overview camera.
   const FRONT: [number, number, number][] = [
-    [0.64, 0.5, 1.2],
-    [0.82, 0.52, 1.7],
-    [0.88, 0.62, 2.4],
-    [0.9, 0.86, 3.6],
-    [0.92, 0.9, 4.4],
-    [0.92, 0.9, 4.4],
+    [0.82, 0.64, 1.55],
+    [0.9, 0.72, 2.1],
+    [0.94, 0.9, 3.1],
+    [0.97, 1.28, 5.2],
+    [0.99, 2.05, 9.5],
+    [0.99, 2.15, 13],
   ];
   const [share, ratio, cap] = FRONT[Math.min(level, 5)];
-  const side =
-    level >= 4 ||
-    (level === 3 && (m.variant % 2 === 1 || wantsSide)) ||
-    (level === 2 && (m.variant % 2 === 1 || wantsSide));
-  const band = level >= 4 || (level === 3 && !side);
-  // The rooftop sign is a complement: only on rooftop/wrapped silhouettes, compact, and
-  // always on landmarks as their lit crown.
-  const rooftop =
-    !roofless &&
-    (level >= 4 || m.pattern === "rooftop" || m.pattern === "wrapped");
+  const side = level >= 4 || (level >= 2 && (banner || m.variant % 2 === 1));
+  const band = level >= 3;
+  // Every flat-roofed owned building gets the secondary skyline read. Tier sizing keeps the
+  // hierarchy without relying on the sign as the only ownership cue.
+  const rooftop = !roofless;
   const panel = {
     p,
     palette,
@@ -419,30 +409,29 @@ export function BrandSign({
           tier={tier}
           palette={palette}
           maxWidth={maxSignWidth}
-          compact={level < 4}
         />
       )}
       <BrandPanel
         {...panel}
         side={false}
-        share={band ? Math.min(share, 0.64) : share}
-        offset={band ? 0.15 : 0}
-        ratio={banner && !wantsSide ? Math.min(ratio, 0.56) : ratio}
+        share={band ? Math.min(share, level >= 4 ? 0.76 : 0.7) : share}
+        offset={band ? 0.115 : 0}
+        ratio={ratio}
         cap={cap}
         screen={arch === "leisure"}
-        image={banner && !wantsSide}
+        image={banner && (level >= 3 || !wantsSide)}
       />
       {side && (
         <BrandPanel
           {...panel}
           side
-          share={level >= 4 ? 0.82 : 0.74}
-          ratio={level >= 3 ? 1.6 : 1}
-          cap={level >= 4 ? 7 : level === 3 ? 5 : 2.6}
-          image={wantsSide}
+          share={level >= 4 ? 0.94 : level >= 3 ? 0.86 : 0.78}
+          ratio={level >= 4 ? 2 : level >= 3 ? 1.6 : 1.1}
+          cap={level >= 4 ? 9 : level === 3 ? 5.5 : 3.2}
+          image={wantsSide && level < 3}
         />
       )}
-      {band && <VerticalBanner p={p} palette={palette} />}
+      {band && <VerticalBanner p={p} palette={palette} level={level} />}
       {cafe && (
         <>
           <Piece

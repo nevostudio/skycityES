@@ -313,6 +313,8 @@ export type PublicProperty = Property & {
 };
 export type CityData = {
   demo: boolean;
+  /** Recorded city visits and an optional presence provider; null means not connected. */
+  metrics?: CityMetrics;
   properties: PublicProperty[];
   districts: District[];
   activity: Activity[];
@@ -328,4 +330,9 @@ export type CityData = {
     builtToday: number;
     auctions: number;
   };
+};
+export type CityMetrics = {
+  totalVisits: number;
+  online: number | null;
+  onlineSource: "live" | "demo" | "unavailable";
 };

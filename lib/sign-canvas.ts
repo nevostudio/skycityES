@@ -183,27 +183,28 @@ export function drawRooftopSign(
   c.fillStyle = background;
   roundRect(c, 0, 0, W, H, H * 0.06);
   c.fill();
-  const strip = H * 0.085;
+  // Keep framing quiet so the logo and name occupy nearly the whole visible surface.
+  const strip = H * 0.055;
   c.fillStyle = accent;
   c.fillRect(0, H - strip, W, strip);
   if (lit) {
     c.strokeStyle = accent;
-    c.lineWidth = H * 0.025;
+    c.lineWidth = H * 0.014;
     roundRect(
       c,
-      H * 0.03,
-      H * 0.03,
-      W - H * 0.06,
-      H - strip - H * 0.04,
-      H * 0.05,
+      H * 0.018,
+      H * 0.018,
+      W - H * 0.036,
+      H - strip - H * 0.024,
+      H * 0.035,
     );
     c.stroke();
   }
-  const pad = H * 0.13;
+  const pad = H * 0.065;
   const x0 = pad,
     y0 = pad,
     w = W - pad * 2,
-    h = H - strip - pad * 1.7;
+    h = H - strip - pad * 1.35;
   const tagline = ad.tagline?.trim() || "";
   const name = ad.brand.trim().toUpperCase();
   c.textBaseline = "alphabetic";
@@ -225,19 +226,19 @@ export function drawRooftopSign(
     if (ink !== DARK_INK) {
       // Light tile behind logos on dark signs keeps transparent dark logos readable.
       c.fillStyle = "#fbf8f0";
-      roundRect(c, x0, y0, icon, icon, icon * 0.14);
+      roundRect(c, x0, y0, icon, icon, icon * 0.08);
       c.fill();
       contain(
         c,
         logo,
-        x0 + icon * 0.08,
-        y0 + icon * 0.08,
-        icon * 0.84,
-        icon * 0.84,
+        x0 + icon * 0.04,
+        y0 + icon * 0.04,
+        icon * 0.92,
+        icon * 0.92,
       );
     } else contain(c, logo, x0, y0, icon, icon);
-  } else emblem(c, ad, x0 + icon * 0.06, y0 + icon * 0.06, icon * 0.88);
-  const tx = x0 + icon + pad * 0.75,
+  } else emblem(c, ad, x0 + icon * 0.03, y0 + icon * 0.03, icon * 0.94);
+  const tx = x0 + icon + pad * 0.5,
     tw = W - pad - tx;
   c.textAlign = "left";
   c.fillStyle = ink;

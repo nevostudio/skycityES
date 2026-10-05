@@ -138,50 +138,6 @@ button:focus-visible {
   letter-spacing: 0.1em;
 }
 
-/* Search and filters: one floating, quiet bar */
-/* Next to the brand, clear of the navigation on the right. */
-.immersive-app .map-toolbar {
-  top: 16px;
-  left: 178px;
-  transform: none;
-  height: 48px;
-  width: min(600px, calc(100% - 178px - 520px));
-  min-width: 380px;
-  padding: 6px 8px 6px 16px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--glass);
-  box-shadow: var(--float);
-  z-index: 31;
-}
-.immersive-app .search-box input {
-  font-size: 13px !important;
-  color: var(--ink);
-}
-.immersive-app .search-box kbd {
-  display: none;
-}
-.immersive-app .quick-filters button {
-  font-size: 12px;
-  padding: 7px 11px;
-  border-radius: 10px;
-  color: var(--ink-soft);
-  background: transparent;
-}
-.immersive-app .quick-filters button:hover {
-  background: var(--sand);
-}
-.immersive-app .quick-filters button.active {
-  background: var(--ink);
-  color: var(--cream);
-}
-.immersive-app .quick-filters .status-dot {
-  display: none;
-}
-.immersive-app .filter-select {
-  color: var(--muted);
-}
-
 /* Districts: secondary, below the navigation */
 .immersive-app .world-district-control {
   top: 76px;
@@ -915,13 +871,6 @@ button:focus-visible {
   .immersive-app .demo-label {
     display: none;
   }
-  .immersive-app .map-toolbar {
-    width: min(560px, calc(100% - 178px - 440px));
-    min-width: 330px;
-  }
-  .immersive-app .quick-filters button {
-    padding: 7px 8px;
-  }
 }
 @media (max-width: 760px) {
   .immersive-app .header {
@@ -938,14 +887,6 @@ button:focus-visible {
   .immersive-app .header-right .button {
     height: 44px;
     min-height: 44px;
-  }
-  .immersive-app .map-toolbar {
-    top: 64px;
-    left: 12px;
-    right: 12px;
-    width: auto;
-    min-width: 0;
-    overflow-x: auto;
   }
   .immersive-app .world-district-control {
     display: none;

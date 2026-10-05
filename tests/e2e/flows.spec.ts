@@ -64,7 +64,7 @@ test("explorar → construir aquí → compartir → editar → enlace de acceso
     (v: Plot) => v.id === p.id,
   );
   expect(built.building.tier).toBe("STARTER");
-  await page.getByRole("link", { name: "Mis edificios", exact: true }).click();
+  await page.goto("/my-buildings");
   await expect(
     page.getByRole("heading", { name: "Browser Test Studio", exact: true }),
   ).toBeVisible();
@@ -199,7 +199,7 @@ test("mobile city and bottom sheet fit without horizontal overflow", async ({
   await page.goto("/");
   await expect(page.locator("canvas")).toBeVisible();
   await page
-    .getByRole("button", { name: "Elegir mi solar", exact: true })
+    .getByRole("button", { name: "Construir desde 3 €", exact: true })
     .click();
   await expect(
     page.getByRole("complementary", { name: "Solar seleccionado" }),
