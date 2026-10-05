@@ -31,12 +31,15 @@ test("explorar → construir aquí → compartir → editar → enlace de acceso
   await expect(
     page.getByRole("group", { name: "1. Elige el tamaño de tu edificio" }),
   ).toBeVisible();
+  // Three steps: Tamaño → Marca → Pago.
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page
     .getByRole("textbox", { name: "Nombre de la marca", exact: true })
     .fill("Browser Test Studio");
   await page
     .getByRole("textbox", { name: "Web opcional", exact: true })
     .fill("https://example.com");
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
   await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await expect(
@@ -209,6 +212,7 @@ test("mobile city and bottom sheet fit without horizontal overflow", async ({
   await page
     .getByRole("button", { name: "CONSTRUIR AQUÍ", exact: true })
     .click();
+  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(
     page.getByRole("textbox", { name: "Nombre de la marca", exact: true }),
   ).toBeVisible();

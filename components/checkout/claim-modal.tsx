@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShieldCheck, Check, Loader2, Mail, Hammer } from "lucide-react";
+import {
+  ShieldCheck,
+  Check,
+  Loader2,
+  Mail,
+  Hammer,
+  ArrowRight,
+  ArrowLeft,
+} from "lucide-react";
 import type { Ad, PublicProperty, PresenceTier } from "@/types";
 import {
   PRESENCE,
@@ -8,15 +16,15 @@ import {
   claimPrice,
   presenceLevel,
   upgradePrice,
-  withBuilding,
 } from "@/lib/presence";
+import { architectureOf, massing } from "@/lib/massing";
 import { DISTRICTS_ES } from "@/lib/plots";
 import { PresenceSelector } from "./presence-selector";
 import { emptyAd } from "@/lib/seed";
 import { api, euro } from "@/lib/client";
 import { Modal } from "../modal";
 import { AdFields } from "./ad-fields";
-import { BuildingArt } from "../property/building-art";
+import { TierArt } from "../property/tier-art";
 import { CONTROL_NOTICE, TRANSFER_NOTICE } from "@/lib/takeover-policy";
 type Checkout = {
   reservation: string;
@@ -26,9 +34,16 @@ type Checkout = {
   demo: boolean;
   url?: string;
 };
+type Step = "size" | "brand" | "pay";
+const STEP_LABEL: Record<Step, string> = {
+  size: "Tamaño",
+  brand: "Marca",
+  pay: "Pago",
+};
 /**
- * Explore → choose plot → BUILD HERE → size → customize → email → payment.
- * With upgradeLeaseId the same flow grows an existing building and charges only the difference.
+ * Three steps (PDF): Tamaño → Marca → Pago, with a live preview of the building and its
+ * brand. Upgrades skip the brand; takeovers and skyscrapers skip the size. Same logic and
+ * endpoints as before.
  */
 export function ClaimModal({
   property: p,
@@ -70,6 +85,23 @@ export function ClaimModal({
   const [error, setError] = useState("");
   const [checkout, setCheckout] = useState<Checkout | null>(null);
   const [remaining, setRemaining] = useState("");
+  const steps: Step[] =
+    takeover || sky
+      ? ["brand", "pay"]
+      : upgradeLeaseId
+        ? ["size", "pay"]
+        : ["size", "brand", "pay"];
+  const [step, setStep] = useState(0);
+  const current = steps[step];
+  const last = step === steps.length - 1;
+  function next() {
+    if (current === "brand" && ad.brand.trim().length < 2) {
+      setError("Escribe el nombre de tu marca (mínimo 2 caracteres).");
+      return;
+    }
+    setError("");
+    setStep((s) => Math.min(steps.length - 1, s + 1));
+  }
   useEffect(() => {
     if (!checkout) return;
     const tick = () => {
@@ -87,6 +119,7 @@ export function ClaimModal({
   }, [checkout]);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!last) return next();
     setBusy(true);
     setError("");
     try {
@@ -129,6 +162,17 @@ export function ClaimModal({
     }
   }
   const tierLabel = sky ? "RASCACIELOS" : presenceTier;
+  const arch = architectureOf(p.districtId);
+  const previewTier = sky ? "SKYSCRAPER" : presenceTier;
+  const headline = takeover
+    ? "Tu marca. Este edificio."
+    : checkout
+      ? "Un último paso."
+      : upgradeLeaseId
+        ? "Más altura. Mismo solar."
+        : current === "brand"
+          ? "Tu marca. Tu edificio."
+          : "Pago único.";
   return (
     <Modal
       title={
@@ -141,192 +185,227 @@ export function ClaimModal({
               : "CONSTRUYE AQUÍ"
       }
       onClose={onClose}
-      className="claim-modal"
+      className="claim-modal sc-checkout"
     >
-      <div className="claim-heading">
-        <h2>
-          {takeover
-            ? "Tu marca. Este edificio."
-            : checkout
-              ? "Un último paso."
-              : upgradeLeaseId
-                ? "Más altura. Mismo solar."
-                : "Tu marca. Tu edificio."}
-        </h2>
-        <p>
-          {takeover
-            ? "El edificio mantiene su altura y tier. Personaliza la marca que se mostrará al completar el takeover."
-            : checkout
-              ? "En cuanto confirmes el pago, empieza la obra."
-              : upgradeLeaseId
-                ? "Tu marca y tu ubicación se quedan exactamente igual."
-                : "Un pequeño rincón de internet, construido para ti."}
-        </p>
-      </div>
-      {!sky && (
-        <div className="takeover-notice">
-          <strong>{CONTROL_NOTICE}</strong>
-          <p>{TRANSFER_NOTICE}</p>
-          <p>
-            Tras el pago tendrás {p.takeover?.protectionHours ?? 24} horas de
-            protección. El anterior controlador no recibe dinero ni
-            compensación.
-          </p>
-          {takeover && (
-            <p>
-              Tu importe se convertirá en el nuevo valor que deberá superar la
-              siguiente persona. Si el control cambia durante el pago, no
-              recibirás la ubicación y se devolverá íntegramente tu pago.
-            </p>
-          )}
-        </div>
-      )}
-      <div className="claim-preview">
-        <BuildingArt
-          property={withBuilding(
-            { ...p, color: ad.primary },
-            sky ? "SKYSCRAPER" : presenceTier,
-          )}
-          brand={ad.brand || "TU MARCA"}
-        />
-        <div>
+      <div className="sc-checkout-grid">
+        <aside className="sc-checkout-preview" aria-label="Vista previa">
+          <div className="sc-checkout-art">
+            <TierArt
+              tier={previewTier}
+              color={ad.primary}
+              initial={ad.brand || "T"}
+              glass={arch === "corporate" || arch === "tech"}
+              roof={massing({ ...p, building: { tier: previewTier } }).roof}
+              fit="single"
+              label={`Vista previa del edificio ${tierLabel} con tu marca`}
+            />
+          </div>
           <span className="eyebrow">
             {DISTRICTS_ES[p.districtId]?.name || p.districtId}
           </span>
           <h3>{p.name}</h3>
           <span className="tag">{tierLabel}</span>
-        </div>
-      </div>
-      {checkout ? (
-        <div className="checkout-confirm">
-          <div className="notice">
-            <ShieldCheck size={20} />
-            <div>
-              <strong>Pago de demostración · sin cargo</strong>
-              <p>Simula un pago correcto. No hace falta tarjeta.</p>
+          <div className="sc-total">
+            <small>
+              {takeover ? "Tu oferta" : upgradeLeaseId ? "Pagas" : "Total"}
+            </small>
+            <strong>{euro(amount)}</strong>
+            <span>Pago único</span>
+          </div>
+          {!sky && (
+            <div className="takeover-notice">
+              <strong>{CONTROL_NOTICE}</strong>
+              <p>{TRANSFER_NOTICE}</p>
+              <p>
+                Tras el pago tendrás {p.takeover?.protectionHours ?? 24} horas
+                de protección. El anterior controlador no recibe dinero ni
+                compensación.
+              </p>
+              {takeover && (
+                <p>
+                  Tu importe se convertirá en el nuevo valor que deberá superar
+                  la siguiente persona. Si el control cambia durante el pago, no
+                  recibirás la ubicación y se devolverá íntegramente tu pago.
+                </p>
+              )}
             </div>
-          </div>
-          <div className="receipt">
-            <span>
-              {ad.brand} ·{" "}
-              {upgradeLeaseId
-                ? `${currentTier} → ${presenceTier}`
-                : `Edificio ${tierLabel}`}
-            </span>
-            <strong>{euro(checkout.amount)}</strong>
-          </div>
-          <p className="muted">
-            <Mail size={14} /> {email}
-          </p>
-          <p className="microcopy">
-            {takeover ? "Checkout válido durante" : "Reservado durante"}{" "}
-            {remaining}
-            {takeover &&
-              " · No reserva el control: se comprueba al confirmar el pago."}
-          </p>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
           )}
-          <button
-            className="button coral wide"
-            disabled={busy || remaining === "0:00"}
-            onClick={pay}
-          >
-            {busy ? (
-              <Loader2 className="spin" size={18} />
-            ) : (
-              <Check size={18} />
-            )}
-            {upgradeLeaseId
-              ? "Completar mejora de demostración"
-              : "Completar pago de demostración"}
-          </button>
-          <p className="microcopy">Pago único. Sin cargos recurrentes.</p>
-        </div>
-      ) : (
-        <form onSubmit={submit}>
-          {!sky && !takeover && (
-            <PresenceSelector
-              property={{ ...p, ad }}
-              value={presenceTier}
-              onChange={setPresenceTier}
-              current={upgradeLeaseId ? currentTier : undefined}
-            />
+        </aside>
+        <div className="sc-checkout-main">
+          {!checkout && (
+            <ol className="sc-steps" aria-label="Pasos">
+              {steps.map((st, i) => (
+                <li
+                  key={st}
+                  className={i === step ? "active" : i < step ? "done" : ""}
+                  aria-current={i === step ? "step" : undefined}
+                >
+                  <span>{i < step ? <Check size={12} /> : i + 1}</span>
+                  {STEP_LABEL[st]}
+                </li>
+              ))}
+            </ol>
           )}
-          {upgradeLeaseId ? (
-            <div className="receipt">
-              <span>
-                {currentTier} {euro(PRESENCE[currentTier].price)} →{" "}
-                {presenceTier} {euro(PRESENCE[presenceTier].price)}
-                <small>Mismo solar · el edificio crece</small>
-              </span>
-              <strong>Pagas {euro(amount)}</strong>
+          {current !== "size" && (
+            <div className="claim-heading">
+              <h2>{headline}</h2>
+            </div>
+          )}
+          {checkout ? (
+            <div className="checkout-confirm">
+              <div className="notice">
+                <ShieldCheck size={20} />
+                <div>
+                  <strong>Pago de demostración · sin cargo</strong>
+                  <p>Simula un pago correcto. No hace falta tarjeta.</p>
+                </div>
+              </div>
+              <div className="receipt">
+                <span>
+                  {ad.brand} ·{" "}
+                  {upgradeLeaseId
+                    ? `${currentTier} → ${presenceTier}`
+                    : `Edificio ${tierLabel}`}
+                </span>
+                <strong>{euro(checkout.amount)}</strong>
+              </div>
+              <p className="muted">
+                <Mail size={14} /> {email}
+              </p>
+              <p className="microcopy">
+                {takeover ? "Checkout válido durante" : "Reservado durante"}{" "}
+                {remaining}
+                {takeover &&
+                  " · No reserva el control: se comprueba al confirmar el pago."}
+              </p>
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button
+                className="button coral wide"
+                disabled={busy || remaining === "0:00"}
+                onClick={pay}
+              >
+                {busy ? (
+                  <Loader2 className="spin" size={18} />
+                ) : (
+                  <Check size={18} />
+                )}
+                {upgradeLeaseId
+                  ? "Completar mejora de demostración"
+                  : "Completar pago de demostración"}
+              </button>
+              <p className="microcopy">Pago único. Sin cargos recurrentes.</p>
             </div>
           ) : (
-            <>
-              <h3 className="form-step">
-                {sky
-                  ? "1. Personaliza tu rascacielos"
-                  : "2. Personaliza tu edificio"}
-              </h3>
-              <AdFields
-                ad={ad}
-                onChange={setAd}
-                tier={sky ? "SKYSCRAPER" : presenceTier}
-              />
-            </>
+            <form onSubmit={submit}>
+              {current === "size" && (
+                <>
+                  <PresenceSelector
+                    property={{ ...p, ad }}
+                    value={presenceTier}
+                    onChange={setPresenceTier}
+                    current={upgradeLeaseId ? currentTier : undefined}
+                  />
+                  {upgradeLeaseId && (
+                    <div className="receipt">
+                      <span>
+                        {currentTier} {euro(PRESENCE[currentTier].price)} →{" "}
+                        {presenceTier} {euro(PRESENCE[presenceTier].price)}
+                        <small>Mismo solar · el edificio crece</small>
+                      </span>
+                      <strong>Pagas {euro(amount)}</strong>
+                    </div>
+                  )}
+                </>
+              )}
+              {current === "brand" && (
+                <AdFields
+                  ad={ad}
+                  onChange={setAd}
+                  tier={sky ? "SKYSCRAPER" : presenceTier}
+                />
+              )}
+              {current === "pay" && (
+                <>
+                  <label>
+                    Tu email
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      readOnly={!!upgradeLeaseId}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="tu@email.com"
+                    />
+                    <small className="field-hint">
+                      Tu recibo y un enlace de acceso seguro. Sin contraseñas.
+                    </small>
+                  </label>
+                  <p className="fine-print">
+                    Al continuar aceptas mostrar tu marca en SkyCity. Debes
+                    tener los derechos de tu contenido; los anuncios ilegales o
+                    dañinos pueden suspenderse. Un edificio en SkyCity es un
+                    espacio publicitario virtual, no una propiedad inmobiliaria
+                    ni una inversión.
+                  </p>
+                </>
+              )}
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              <div className="sc-step-actions">
+                {step > 0 && (
+                  <button
+                    type="button"
+                    className="button outline"
+                    onClick={() => {
+                      setError("");
+                      setStep(step - 1);
+                    }}
+                  >
+                    <ArrowLeft size={16} /> Atrás
+                  </button>
+                )}
+                {last ? (
+                  <button className="button coral wide" disabled={busy}>
+                    {busy ? (
+                      <Loader2 size={18} className="spin" />
+                    ) : (
+                      <>
+                        {takeover
+                          ? "HACERME CON ESTA UBICACIÓN"
+                          : upgradeLeaseId
+                            ? "Mejorar"
+                            : "Construir"}{" "}
+                        por {euro(amount)}
+                        <Hammer size={18} />
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button className="button dark wide">
+                    Continuar <ArrowRight size={16} />
+                  </button>
+                )}
+              </div>
+              {last && (
+                <p className="microcopy">
+                  <ShieldCheck size={13} />
+                  {demo
+                    ? "Pago de demostración · sin cobro real"
+                    : "Pago seguro con Stripe"}{" "}
+                  · Pago único
+                </p>
+              )}
+            </form>
           )}
-          <label>
-            {upgradeLeaseId ? "Tu email" : sky ? "2. Tu email" : "3. Tu email"}
-            <input
-              type="email"
-              required
-              value={email}
-              readOnly={!!upgradeLeaseId}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@email.com"
-            />
-            <small className="field-hint">
-              Tu recibo y un enlace de acceso seguro. Sin contraseñas.
-            </small>
-          </label>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <button className="button coral wide" disabled={busy}>
-            {busy ? (
-              <Loader2 size={18} className="spin" />
-            ) : (
-              <>
-                {takeover
-                  ? "HACERME CON ESTA UBICACIÓN"
-                  : upgradeLeaseId
-                    ? "Mejorar"
-                    : "Construir"}{" "}
-                por {euro(amount)}
-                <Hammer size={18} />
-              </>
-            )}
-          </button>
-          <p className="microcopy">
-            <ShieldCheck size={13} />
-            {demo
-              ? "Pago de demostración · sin cobro real"
-              : "Pago seguro con Stripe"}{" "}
-            · Pago único
-          </p>
-          <p className="fine-print">
-            Al continuar aceptas mostrar tu marca en SkyCity. Debes tener los
-            derechos de tu contenido; los anuncios ilegales o dañinos pueden
-            suspenderse. Un edificio en SkyCity es un espacio publicitario
-            virtual, no una propiedad inmobiliaria ni una inversión.
-          </p>
-        </form>
-      )}
+        </div>
+      </div>
     </Modal>
   );
 }

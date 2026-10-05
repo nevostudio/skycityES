@@ -272,6 +272,12 @@ export type State = {
   settings: Settings[];
   propertyTakeovers: PropertyTakeover[];
 };
+export type ValueStep = {
+  kind: "build" | "takeover";
+  amount: number;
+  at: string;
+  brand: string;
+};
 export type PlotStatus =
   "available" | "reserved" | "claimed" | "auction" | "public";
 export type BuildingView = {
@@ -289,6 +295,8 @@ export type PublicProperty = Property & {
   ad?: Ad;
   views: number;
   presenceTier?: PresenceTier;
+  /** Real control history of the location: initial purchase, then completed takeovers. */
+  valueHistory?: ValueStep[];
   takeover?: {
     eligible: boolean;
     open: boolean;

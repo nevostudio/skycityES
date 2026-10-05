@@ -5,7 +5,30 @@ import { DARK_INK, contrastInk, mark, signColors } from "./brand-theme";
  * Canvas drawing shared by the 3D rooftop signs and the 2D preview in "Editar marca".
  * No three.js here, so the dashboard can render previews without loading the city.
  */
-const FONT = "Helvetica, Arial, sans-serif";
+const FALLBACK = "Helvetica, Arial, sans-serif";
+let display: string | null = null;
+let ui: string | null = null;
+/** Bricolage for names and figures on signs (PDF), Instrument Sans for short phrases. */
+function family(kind: "display" | "ui") {
+  if (typeof document === "undefined") return FALLBACK;
+  const read = (v: string) =>
+    getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  if (kind === "display") display ??= read("--font-display");
+  else ui ??= read("--font-ui");
+  const name = kind === "display" ? display : ui;
+  return name ? `${name}, ${FALLBACK}` : FALLBACK;
+}
+let ready: Promise<void> | null = null;
+/** Resolves once the sign fonts can be drawn on a canvas (redraw after it). */
+export function signFontsReady() {
+  if (typeof document === "undefined") return Promise.resolve();
+  return (ready ??= Promise.all([
+    document.fonts.load(`800 40px ${family("display")}`),
+    document.fonts.load(`500 40px ${family("ui")}`),
+  ])
+    .then(() => undefined)
+    .catch(() => undefined));
+}
 const demoMarks = new Set([
   "Nova Labs",
   "Pixel Coffee",
@@ -68,12 +91,13 @@ function fit(
   start: number,
   min: number,
   weight: string,
+  kind: "display" | "ui" = "display",
 ) {
   let size = start;
-  c.font = `${weight} ${size}px ${FONT}`;
+  c.font = `${weight} ${size}px ${family(kind)}`;
   while (size > min && c.measureText(text).width > width) {
     size -= 2;
-    c.font = `${weight} ${size}px ${FONT}`;
+    c.font = `${weight} ${size}px ${family(kind)}`;
   }
   return size;
 }
@@ -133,7 +157,7 @@ function emblem(
   c.fillStyle = contrastInk(accent);
   c.textAlign = "center";
   c.textBaseline = "middle";
-  c.font = `800 ${size * 0.56}px ${FONT}`;
+  c.font = `800 ${size * 0.56}px ${family("display")}`;
   c.fillText(
     ad.brand.trim().charAt(0).toUpperCase(),
     x + size / 2,
@@ -190,7 +214,7 @@ export function drawRooftopSign(
       c.fillStyle = ink;
       c.globalAlpha = 0.82;
       c.textAlign = "center";
-      fit(c, tagline, w, h * 0.27, h * 0.15, "500");
+      fit(c, tagline, w, h * 0.27, h * 0.15, "500", "ui");
       c.fillText(tagline, W / 2, y0 + h * 0.95, w);
       c.globalAlpha = 1;
     }
@@ -221,7 +245,7 @@ export function drawRooftopSign(
   c.fillText(name, tx, tagline ? y0 + h * 0.5 : y0 + h / 2 + size * 0.36, tw);
   if (tagline) {
     c.globalAlpha = 0.8;
-    fit(c, tagline, tw, h * 0.25, h * 0.14, "500");
+    fit(c, tagline, tw, h * 0.25, h * 0.14, "500", "ui");
     c.fillText(tagline, tx, y0 + h * 0.92, tw);
     c.globalAlpha = 1;
   }
@@ -250,4 +274,68 @@ export function drawSupportImage(
   const box = Math.min(W, H) * 0.7;
   if (logo) contain(c, logo, (W - W * 0.8) / 2, (H - box) / 2, W * 0.8, box);
   else emblem(c, ad, (W - box) / 2, (H - box) / 2, box);
+}
+
+/** Vertical banner (lona vertical) for PREMIUM and LANDMARK: brand colour and its emblem. */
+export function drawVerticalBanner(
+  canvas: HTMLCanvasElement,
+  ad: Ad,
+  logo: Bitmap | null,
+) {
+  const c = canvas.getContext("2d")!;
+  const W = canvas.width,
+    H = canvas.height;
+  const { accent } = signColors(ad);
+  c.clearRect(0, 0, W, H);
+  c.fillStyle = accent;
+  c.fillRect(0, 0, W, H);
+  const disc = W * 0.62;
+  const x = (W - disc) / 2,
+    y = W * 0.24;
+  c.fillStyle = "#fbf8f1";
+  c.beginPath();
+  c.arc(W / 2, y + disc / 2, disc / 2, 0, Math.PI * 2);
+  c.fill();
+  if (logo)
+    contain(
+      c,
+      logo,
+      x + disc * 0.16,
+      y + disc * 0.16,
+      disc * 0.68,
+      disc * 0.68,
+    );
+  else {
+    c.fillStyle = accent;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = `800 ${disc * 0.56}px ${family("display")}`;
+    c.fillText(ad.brand.trim().charAt(0).toUpperCase(), W / 2, y + disc * 0.53);
+  }
+  c.fillStyle = "rgba(251, 248, 241, 0.55)";
+  c.fillRect(W * 0.38, y + disc + W * 0.3, W * 0.24, W * 0.04);
+}
+
+/** Facade screen (Distrito de Ocio): a lit panel with the brand emblem. */
+export function drawScreen(
+  canvas: HTMLCanvasElement,
+  ad: Ad,
+  logo: Bitmap | null,
+) {
+  const c = canvas.getContext("2d")!;
+  const W = canvas.width,
+    H = canvas.height;
+  const { accent } = signColors(ad);
+  const g = c.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#1c2629");
+  g.addColorStop(1, "#2c3438");
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
+  c.fillStyle = accent;
+  c.globalAlpha = 0.85;
+  c.fillRect(0, H * 0.86, W, H * 0.14);
+  c.globalAlpha = 1;
+  const box = H * 0.62;
+  if (logo) contain(c, logo, (W - W * 0.6) / 2, H * 0.1, W * 0.6, box);
+  else emblem(c, ad, (W - box) / 2, H * 0.1, box);
 }

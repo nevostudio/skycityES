@@ -100,7 +100,7 @@ export function PlotField({
           sy: loud ? 0.1 : 0.06,
           sz: p.depth + 0.5,
         },
-        c: off ? "#d9dbd1" : loud ? "#e6e1d2" : "#e1ddd0",
+        c: off ? "#e6e1d6" : loud ? "#efe8da" : "#ece6d9",
         r,
       });
       soils.push({
@@ -113,12 +113,12 @@ export function PlotField({
           sz: p.depth + 0.1,
         },
         c: off
-          ? "#d3d5ca"
+          ? "#e3ddd0"
           : reserved
-            ? "#b7a580"
+            ? "#d6c6a2"
             : loud
-              ? "#c9b48c"
-              : "#d8cfb9",
+              ? "#ddc9a1"
+              : "#e8dcc2",
         r,
       });
       for (const [cx, cz] of corners) {
@@ -129,24 +129,25 @@ export function PlotField({
             loud || reserved
               ? { ...at, y: 0.66, sx: 0.07, sy: 0.5, sz: 0.07 }
               : { ...at, y: 0.3, sx: 0.001, sy: 0.001, sz: 0.001 },
-          c: off ? "#c4c7bd" : reserved ? "#e2bb4f" : "#e28a4f",
+          c: off ? "#d3cfc4" : reserved ? "#c9b27a" : "#9a8f78",
           r,
         });
       }
       // Available: a small "+" drawn on the soil. Reserved: foundation footings already laid.
+      // No permanent "+": it appears on hover, or with the "Solares libres" filter.
       const bar = reserved
         ? [p.width * 0.8, 0.14, 0.2]
         : loud
-          ? [0.95, 0.04, 0.22]
-          : [0.7, 0.02, 0.14];
+          ? [0.8, 0.03, 0.18]
+          : [0.001, 0.001, 0.001];
       const markY = loud || reserved ? 0.5 : 0.42;
       const color = off
-        ? "#cdd0c5"
+        ? "#d9d4c8"
         : reserved
-          ? "#a6a499"
+          ? "#b9b2a0"
           : loud
-            ? "#6f9a6a"
-            : "#b4c2a4";
+            ? "#7fa36f"
+            : "#e8dcc2";
       signs.push(
         {
           m: { x: p.x, y: markY, z: p.z, sx: bar[0], sy: bar[1], sz: bar[2] },
@@ -226,24 +227,40 @@ export function PlotHighlight({
   return (
     <group position={[p.x, 0.32, p.z]} rotation={[0, p.rotation, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <planeGeometry args={[p.width + 1.5, p.depth + 1.5]} />
-        <meshBasicMaterial color={selected ? "#e97e51" : "#f6dba2"} />
+        <planeGeometry args={[p.width + 1.2, p.depth + 1.2]} />
+        <meshBasicMaterial
+          color={selected ? "#e8663a" : "#fbf8f1"}
+          transparent
+          opacity={selected ? 0.35 : 0.85}
+        />
       </mesh>
-      {selected ? (
+      <mesh position={[0, 0.1, 0]}>
+        <boxGeometry args={[p.width + 0.1, 0.04, p.depth + 0.1]} />
+        <meshStandardMaterial color={selected ? "#f3d3c0" : "#e2d2ae"} />
+      </mesh>
+      {/* Small "+" only on hover or selection: the plot invites, it does not shout. */}
+      {[
+        [0.9, 0.18],
+        [0.18, 0.9],
+      ].map(([sx, sz]) => (
+        <mesh key={sx} position={[0, 0.16, 0]}>
+          <boxGeometry args={[sx, 0.04, sz]} />
+          <meshBasicMaterial color={selected ? "#e8663a" : "#7fa36f"} />
+        </mesh>
+      ))}
+      {selected && (
         <SelectionFrame w={p.width + 0.4} d={p.depth + 0.4} h={1.1} />
-      ) : (
-        <lineSegments
-          position={[0, 0.4, 0]}
-          scale={[p.width + 0.6, 0.6, p.depth + 0.6]}
-        >
-          <edgesGeometry args={[box]} />
-          <lineBasicMaterial color="#94d69a" toneMapped={false} />
-        </lineSegments>
       )}
     </group>
   );
 }
 
+/** Unit box edges with line distances precomputed once for dashed outlines. */
+const dashedEdges = (() => {
+  const line = new THREE.LineSegments(new THREE.EdgesGeometry(box));
+  line.computeLineDistances();
+  return line.geometry;
+})();
 function useSiteSign(title: string, note: string) {
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -327,14 +344,28 @@ export const PremiumSite = memo(function PremiumSite({
       {(selected || hover) && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
           <planeGeometry args={[w + 2, d + 2]} />
-          <meshBasicMaterial color={selected ? "#e97e51" : "#f6dba2"} />
+          <meshBasicMaterial color={selected ? "#e8663a" : "#fbf8f1"} />
         </mesh>
       )}
       <Block
         position={[0, 0.08, 0]}
         scale={[w + 0.8, 0.16, d + 0.8]}
-        color="#a9a69c"
+        color="#d9d1c0"
       />
+      {/* The future tower, drawn as a dashed volume (PDF page 1). Orange only when live. */}
+      <lineSegments
+        geometry={dashedEdges}
+        position={[0, 9, 0]}
+        scale={[w + 0.4, 18, d + 0.4]}
+      >
+        <lineDashedMaterial
+          color={p.auction ? "#e8663a" : "#9b9384"}
+          dashSize={0.035}
+          gapSize={0.025}
+          transparent
+          opacity={muted ? 0.25 : 0.75}
+        />
+      </lineSegments>
       {[-1, 0, 1].flatMap((x) =>
         [-1, 0, 1].map((z) => (
           <Block
@@ -448,7 +479,8 @@ export const PremiumSite = memo(function PremiumSite({
               onSelect(p);
             }}
           >
-            <span>◆</span> Subasta en directo
+            <span>●</span> Subasta ·{" "}
+            {Math.round(p.auction.currentBid || p.auction.nextBid)} €
           </button>
         </Html>
       )}

@@ -1,4 +1,6 @@
 import type { Property, PublicProperty } from "@/types";
+import { architectureOf, massing } from "@/lib/massing";
+import { TierArt } from "./tier-art";
 export function BuildingArt({
   property,
   brand,
@@ -146,8 +148,18 @@ export function PropertyArt({
   brand?: string;
   className?: string;
 }) {
+  const arch = architectureOf(p.districtId);
   return p.building ? (
-    <BuildingArt property={p} brand={brand} className={className} />
+    <TierArt
+      tier={p.building.tier}
+      color={p.ad?.primary || "#17322a"}
+      initial={brand || p.ad?.brand || p.name}
+      glass={arch === "corporate" || arch === "tech"}
+      roof={massing(p).roof}
+      fit="single"
+      className={className}
+      label={`Edificio ${p.building.tier} de ${brand || p.ad?.brand || p.name}`}
+    />
   ) : (
     <PlotArt
       premium={p.inventory === "skyscraper"}

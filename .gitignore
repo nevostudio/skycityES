@@ -9,3 +9,6 @@ playwright-report/
 supabase/.temp/
 # Capturas locales de verificación visual
 /skycity-*.png
+
+# Scripts locales de verificación
+*.tmp.mjs

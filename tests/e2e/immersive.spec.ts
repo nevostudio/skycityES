@@ -18,7 +18,8 @@ test("fullscreen city: plots, brands, focus, neighborhoods, filters and navigati
     .poll(async () => (await page.locator("canvas").boundingBox())?.width)
     .toBe(1920);
   const canvas = await page.locator("canvas").boundingBox();
-  expect(canvas?.height).toBe(1012);
+  // The city takes the whole viewport: navigation floats over it.
+  expect(canvas?.height).toBe(1080);
   await page.getByRole("button", { name: "Ocultar introducción" }).click();
   await expect(page.locator(".brand-pin, .available-pin")).toHaveCount(0);
   await page

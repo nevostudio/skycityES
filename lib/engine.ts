@@ -4,10 +4,12 @@ import type {
   Building,
   CityData,
   EventName,
+  Lease,
   PublicProperty,
   Reservation,
   State,
   PresenceTier,
+  ValueStep,
 } from "@/types";
 import { emptyAd } from "./seed";
 import {
@@ -103,11 +105,50 @@ function buildingView(b: Building, model: number, now: number) {
     previousTier: b.previousTier,
   };
 }
+/**
+ * Only recorded, settled payments: the initial purchase of the location and each completed
+ * takeover. Upgrades, refunds and demo showcases without payment never appear.
+ */
+function valueHistories(s: State) {
+  const out = new Map<string, ValueStep[]>();
+  const reservations = new Map(s.reservations.map((r) => [r.id, r]));
+  const push = (propertyId: string, step: ValueStep) =>
+    out.set(propertyId, [...(out.get(propertyId) || []), step]);
+  for (const t of s.transactions) {
+    const r = reservations.get(t.reservationId);
+    if (
+      !r ||
+      r.upgradeLeaseId ||
+      r.renewalLeaseId ||
+      r.purpose === "takeover" ||
+      (t.outcome && t.outcome !== "fulfilled")
+    )
+      continue;
+    push(r.propertyId, {
+      kind: "build",
+      amount: t.amount,
+      at: t.createdAt,
+      brand: r.ad.brand,
+    });
+  }
+  for (const t of s.propertyTakeovers)
+    if (t.status === "completed")
+      push(t.property_id, {
+        kind: "takeover",
+        amount: t.takeover_amount,
+        at: t.created_at,
+        brand: reservations.get(t.reservation_id)?.ad.brand || "",
+      });
+  for (const steps of out.values())
+    steps.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  return out;
+}
 export function citySnapshot(
   s: State,
   demo: boolean,
   now = Date.now(),
 ): CityData {
+  const history = valueHistories(s);
   const properties: PublicProperty[] = s.properties
     .filter((p) => p.enabled)
     .map((p) => {
@@ -136,6 +177,7 @@ export function citySnapshot(
         building: b ? buildingView(b, p.model, now) : null,
         presenceTier: lease?.presenceTier,
         takeover: takeoverState(s, p, now),
+        valueHistory: history.get(p.id) || [],
         status:
           b?.kind === "public"
             ? "public"
@@ -583,17 +625,17 @@ function fulfillTakeover(
     );
     return undefined;
   }
-  const lease = {
+  const lease: Lease = {
     id: `lease-${r.id}`,
     propertyId: r.propertyId,
     email: r.email,
     ad: r.ad,
     startsAt: at,
-    status: "active" as const,
+    status: "active",
     demo: provider === "demo",
     autoRenew: false,
     transferable: false,
-    presenceTier: old!.presenceTier || ("STARTER" as const),
+    presenceTier: old!.presenceTier || "STARTER",
     upgradeHistory: [],
   };
   old!.status = "expired";

@@ -9,6 +9,7 @@ import type { District, PublicProperty } from "@/types";
 import { euro, siteNote } from "@/lib/client";
 import { FLOOR_HEIGHT, GROUND_FLOOR_HEIGHT } from "@/lib/presence";
 import { signLimits } from "@/lib/branding";
+import { massing } from "@/lib/massing";
 import { AVENUE, SHOWCASE, showcaseZoom } from "@/lib/showcase";
 
 import {
@@ -82,18 +83,30 @@ function Details({
           r?: number;
         }[] = [];
         // One row per upper floor; the taller ground floor keeps its shopfront.
+        // Above a set-back base the windows move onto the narrower tower faces.
+        const m = massing(p);
         for (let f = 1; f < p.building.floors; f++) {
           const y = GROUND_FLOOR_HEIGHT + (f - 1) * FLOOR_HEIGHT + 0.5;
+          const k = y > m.podium ? m.top : 1;
+          const c = y > m.podium && m.glassTop ? "#7f99a1" : windowColor(p);
           for (let j = -1; j <= 1; j++) {
             a.push({
-              p: [p.x + j * 0.72, y + 0.32, p.z + p.depth / 2 + 0.025],
-              s: [0.42, 0.55, 0.045],
-              c: windowColor(p),
+              p: [
+                p.x + j * 0.72 * k,
+                y + 0.32,
+                p.z + (p.depth * k) / 2 + 0.025,
+              ],
+              s: [0.42 * k, 0.55, 0.045],
+              c,
             });
             a.push({
-              p: [p.x + p.width / 2 + 0.025, y + 0.32, p.z + j * 0.82],
-              s: [0.045, 0.55, 0.46],
-              c: windowColor(p),
+              p: [
+                p.x + (p.width * k) / 2 + 0.025,
+                y + 0.32,
+                p.z + j * 0.82 * k,
+              ],
+              s: [0.045, 0.55, 0.46 * k],
+              c,
             });
           }
         }
@@ -126,28 +139,33 @@ function Details({
         // Keep the showcase front row clear: lighter trees along the boulevard.
         const front = Math.abs(z - AVENUE.z) < 5;
         a.push({
-          p: [x, front ? 1.5 : 2, z],
-          s: front ? [0.7, 1.1, 0.7] : [1.1, 1.7, 1.1],
+          p: [x, front ? 1.05 : 1.25, z],
+          s: front ? [0.5, 0.62, 0.5] : [0.62, 0.78, 0.62],
           c: districtStyle(d.id).trees,
         });
       }
     });
     for (let x = AVENUE.from + 2.5; x <= AVENUE.to - 2.5; x += 3.6)
-      a.push({ p: [x, 1.55, AVENUE.z], s: [0.75, 1.15, 0.75], c: "#6f9a63" });
+      a.push({ p: [x, 1.12, AVENUE.z], s: [0.52, 0.66, 0.52], c: "#8fb07d" });
     for (let i = 0; i < 38; i++)
       a.push({
-        p: [-48 + (i % 8) * 3, 1.8, 32 + Math.floor(i / 8) * 4],
-        s: [1.2, 1.8, 1.2],
-        c: i % 2 ? "#8eab7b" : "#789969",
+        p: [-48 + (i % 8) * 3, 1.3, 32 + Math.floor(i / 8) * 4],
+        s: [0.7, 0.85, 0.7],
+        c: i % 2 ? "#9dbb8a" : "#86a874",
       });
     return a;
   }, [districts]);
   const trunks = useMemo(
     () =>
       trees.map((t) => ({
-        p: [t.p[0], t.p[1] - 1.1, t.p[2]] as [number, number, number],
-        s: [0.18, t.p[1] > 3 ? 0.5 : 1.5, 0.18] as [number, number, number],
-        c: "#9a8c6d",
+        // Small round trees on thin trunks (PDF page 1).
+        p: [t.p[0], (t.p[1] - t.s[1] * 0.6) / 2 + 0.3, t.p[2]] as [
+          number,
+          number,
+          number,
+        ],
+        s: [0.1, t.p[1] - t.s[1] * 0.6, 0.1] as [number, number, number],
+        c: "#a8987a",
       })),
     [trees],
   );
@@ -201,6 +219,50 @@ function windowColor(p: PublicProperty) {
         : districtStyle(p.districtId).glass;
 }
 const noConstruction: Record<string, Construction> = {};
+/** District names painted on the street in front of each district (PDF page 1). */
+function DistrictLabels({ districts }: { districts: District[] }) {
+  const textures = useMemo(
+    () =>
+      districts.map((d) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1024;
+        canvas.height = 96;
+        const c = canvas.getContext("2d")!;
+        c.fillStyle = "rgba(122, 115, 100, 0.55)";
+        c.font = `600 54px ${getComputedStyle(document.documentElement).getPropertyValue("--font-ui") || "sans-serif"}, sans-serif`;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        const text = d.name.toUpperCase().split("").join("\u200a");
+        c.letterSpacing = "14px";
+        c.fillText(text, 512, 50, 1000);
+        const t = new THREE.CanvasTexture(canvas);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 4;
+        return t;
+      }),
+    [districts],
+  );
+  useEffect(() => () => textures.forEach((t) => t.dispose()), [textures]);
+  return (
+    <group name="district-labels">
+      {districts.map((d, i) => (
+        <mesh
+          key={d.id}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[d.x, 0.27, d.z + (d.z + 18 === AVENUE.z ? 16.4 : 17.2)]}
+        >
+          <planeGeometry args={[17, 1.6]} />
+          <meshBasicMaterial
+            map={textures[i]}
+            transparent
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
 /** The showcase avenue: wider carriageways, a planted median and paired lamps. */
 function Boulevard() {
   const length = AVENUE.to - AVENUE.from;
@@ -224,12 +286,12 @@ function Boulevard() {
       <Block
         position={[0, 0.3, AVENUE.z]}
         scale={[length - 1, 0.2, 1.5]}
-        color="#dcd8c7"
+        color="#ece5d4"
       />
       <Block
         position={[0, 0.36, AVENUE.z]}
         scale={[length - 1.4, 0.14, 1.1]}
-        color="#9fbb8a"
+        color="#bcd0a6"
       />
       {Array.from({ length: 5 }, (_, i) => AVENUE.from + 4.3 + i * 7.2).map(
         (x) => (
@@ -256,7 +318,7 @@ function Boulevard() {
       <Block
         position={[0, 0.36, AVENUE.z - AVENUE.width / 2 - 0.55]}
         scale={[length - 2, 0.06, 0.9]}
-        color="#e9dfc8"
+        color="#f1ece1"
       />
     </group>
   );
@@ -548,11 +610,11 @@ export default function CityScene({
       }}
       onPointerMissed={() => setHover(null)}
     >
-      <color attach="background" args={["#e7e9df"]} />
+      <color attach="background" args={["#efe9dc"]} />
       {/* A soft haze on far districts gives depth to the curated first view. */}
-      <fog attach="fog" args={["#e7e9df", 225, 340]} />
-      <ambientLight intensity={1.1} />
-      <hemisphereLight args={["#f4f6e6", "#72886a", 1]} />
+      <fog attach="fog" args={["#efe9dc", 225, 340]} />
+      <ambientLight intensity={1.15} />
+      <hemisphereLight args={["#fbf8f1", "#cbbf9f", 1]} />
       <directionalLight
         position={[-45, 90, 30]}
         intensity={3}
@@ -564,7 +626,7 @@ export default function CityScene({
         shadow-camera-bottom={-95}
         shadow-bias={-0.001}
       />
-      <Block position={[0, -1.1, 5]} scale={[124, 2, 126]} color="#b4c4aa" />
+      <Block position={[0, -1.1, 5]} scale={[124, 2, 126]} color="#d8cdb6" />
       <Block
         position={[0, -0.04, 5]}
         scale={[124, 0.3, 126]}
@@ -575,7 +637,7 @@ export default function CityScene({
         scale={[12, 0.12, 126]}
         color={palette.water}
       />
-      <Block position={[47, 0.17, 5]} scale={[3, 0.15, 126]} color="#ded8c3" />
+      <Block position={[47, 0.17, 5]} scale={[3, 0.15, 126]} color="#ece5d6" />
       {[-54, -18, 18, 54].map((x) => (
         <group key={`v${x}`}>
           <Block
@@ -617,18 +679,14 @@ export default function CityScene({
             scale={[31, 0.3, 29]}
             color={districtStyle(d.id).paving}
           />
-          <Block
-            position={[d.x, 0.37, d.z]}
-            scale={[28.5, 0.08, 0.65]}
-            color={districtStyle(d.id).trim}
-          />
         </group>
       ))}
-      <Block position={[-36, 0.2, 42]} scale={[30, 0.3, 29]} color="#b5c7a0" />
-      <Block position={[-36, 0.4, 42]} scale={[25, 0.1, 2]} color="#dcd8bd" />
+      <DistrictLabels districts={districts} />
+      <Block position={[-36, 0.2, 42]} scale={[30, 0.3, 29]} color="#c9d8b3" />
+      <Block position={[-36, 0.4, 42]} scale={[25, 0.1, 2]} color="#ece5d4" />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-36, 0.5, 42]}>
         <circleGeometry args={[5, 32]} />
-        <meshStandardMaterial color="#8ebbb5" />
+        <meshStandardMaterial color="#a6c9c5" />
       </mesh>
       {[-48, -12, 24, 60].map((z) => (
         <group key={`bridge${z}`} name="bridge">

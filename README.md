@@ -38,6 +38,16 @@ Una ciudad virtual explorable que empieza casi vacía y **se construye según en
 - **Mis edificios → Editar marca**: nombre, frase, web, logo, color de acento, fondo del cartel e imagen publicitaria con su soporte, con vista previa del cartel.
 - NevoStudio es el ejemplo de referencia (`public/brands/`): wordmark transparente, acento `#ff4b00` y la frase «Encuentra tus próximos anunciantes».
 
+## Rediseño visual (PDF «Rediseño visual de SkyCity»)
+
+- Sistema visual: tinta `#17322A`, crema `#FBF8F1`, arena `#F3EEE3`, naranja `#E8663A` (solo selección, directo, pagos y acciones clave) y salvia `#7FA36F`. Bricolage Grotesque para títulos, cifras y carteles; Instrument Sans para la interfaz. Ambas se autoalojan con `next/font` (sin peticiones a Google desde el navegador). Los estilos nuevos viven en `app/redesign.css`, cargado al final.
+- Ciudad-diorama a pantalla completa con interfaz flotante: marca, buscador con filtros (Todo · Solares libres · Construidos · Subastas), navegación ligera y contadores discretos. Suelo crema, parques salvia, árboles pequeños, nombres de barrio pintados en la calle y parcelas premium con el volumen futuro en línea discontinua.
+- Jerarquía: edificios construidos → premium/públicos → infraestructura → solares. Los solares en reposo son casi invisibles; el «+» aparece al pasar el ratón o con el filtro «Solares libres».
+- Edificios (`lib/massing.ts`, `components/city/architecture.tsx`): STARTER/PLUS/PRO una caja; PREMIUM zócalo + cuerpo retranqueado; LANDMARK zócalo + torre de vidrio con remate de marca. Barrios: Centro comercial, Financiero vidrio con planta baja oscura, Tecnológico vidrio claro con franja de color, Ocio fachada de color con pantalla, Casco Antiguo tejado a dos aguas con cartel en fachada, Ribera cubierta verde.
+- Regla de marca: un elemento principal (cartel de azotea con postes, o en fachada en Casco Antiguo) y un secundario opcional según tier y barrio: imagen publicitaria, lona vertical, pantalla, franja o toldo.
+- Panel lateral de 408 px (`components/property/property-panel.tsx`): marca, «TIER · Barrio», visitas, valor actual, historial de valor en escalera con pagos reales (compra inicial y takeovers completados) y CTA «Hacerme con este edificio» con el mínimo real. En solares libres: precio, «CONSTRUIR AQUÍ» y vista previa de los cinco tiers. En móvil es una hoja inferior.
+- Checkout en tres pasos (Tamaño → Marca → Pago) con vista previa del edificio con tu marca; las mejoras omiten «Marca» y los takeovers omiten «Tamaño». Misma lógica y endpoints.
+
 ## Takeover automático (fase 3)
 
 - Cada solar guarda `current_property_value`: el último importe real pagado por controlarlo (claim inicial o takeover). Las mejoras de tamaño no cambian ese valor.

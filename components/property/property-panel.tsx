@@ -1,23 +1,114 @@
 "use client";
+import { useState } from "react";
 import {
   X,
   ArrowUpRight,
-  MapPin,
-  Eye,
-  ShieldCheck,
-  Clock,
   ExternalLink,
   Share2,
   Hammer,
   TrendingUp,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import type { PublicProperty, District } from "@/types";
 import { euro, propertyUrl, siteNote, statusLabel } from "@/lib/client";
-import { PRESENCE } from "@/lib/presence";
+import { PRESENCE, PRESENCE_TIERS } from "@/lib/presence";
+import { architectureOf } from "@/lib/massing";
+import { CONTROL_NOTICE } from "@/lib/takeover-policy";
 import { track } from "@/lib/analytics/client";
-import { PropertyArt } from "./building-art";
-import { TakeoverCard } from "./takeover-card";
+import { TierArt } from "./tier-art";
+import { ValueHistory } from "./value-history";
+import { ClaimModal } from "../checkout/claim-modal";
+
+const count = (n: number) => new Intl.NumberFormat("es-ES").format(n);
+
+/** Brand tile (PDF page 4): the brand colour with its initial. The logo lives on the sign. */
+function BrandTile({ p }: { p: PublicProperty }) {
+  return (
+    <span
+      className="sc-tile"
+      style={{ background: p.ad?.primary || "#17322a" }}
+    >
+      {(p.ad?.brand || p.name).trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+/** Takeover call to action with the real minimum offer; the logic stays server-side. */
+function TakeoverAction({ p, demo }: { p: PublicProperty; demo: boolean }) {
+  const min = p.takeover!.minimumOffer;
+  const [offer, setOffer] = useState(min);
+  const [custom, setCustom] = useState(false);
+  const [checkout, setCheckout] = useState(false);
+  const value = p.current_property_value ?? 0;
+  return (
+    <div className="sc-takeover">
+      <button
+        className="sc-cta"
+        disabled={!Number.isFinite(offer) || offer < min}
+        onClick={() => setCheckout(true)}
+      >
+        Hacerme con este edificio
+        <span className="sc-chip">{euro(offer)}</span>
+      </button>
+      <button
+        type="button"
+        className="sc-link"
+        aria-expanded={custom}
+        onClick={() => setCustom(!custom)}
+      >
+        {custom ? "Usar el mínimo" : "Elegir otro importe"}
+      </button>
+      {custom && (
+        <div className="sc-offer">
+          <label>
+            Tu oferta (€)
+            <input
+              type="number"
+              min={min}
+              step="0.01"
+              value={offer}
+              onChange={(e) => setOffer(Number(e.target.value))}
+            />
+          </label>
+          <div className="takeover-increments">
+            {[1, 5, 10, 25, 50].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className="button outline"
+                onClick={() =>
+                  setOffer(Math.max(min, Math.round((value + n) * 100) / 100))
+                }
+              >
+                +{n} €
+              </button>
+            ))}
+          </div>
+          <p>
+            Tu importe se convertirá en el nuevo valor que deberá superar la
+            siguiente persona.
+          </p>
+        </div>
+      )}
+      {checkout && (
+        <ClaimModal
+          property={p}
+          demo={demo}
+          takeoverOffer={offer}
+          onClose={() => setCheckout(false)}
+          onComplete={() => location.assign(`/?building=${p.id}`)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Property side panel (PDF page 4): ~408 px on the left, almost full height, internal
+ * scroll, the city still visible behind. Built buildings show who controls the location,
+ * what it is worth and its history; free plots show what can be built.
+ */
 export function PropertyPanel({
   property: p,
   district,
@@ -39,131 +130,125 @@ export function PropertyPanel({
 }) {
   const site = p.inventory === "skyscraper" && !p.building;
   const tier = p.building?.tier;
+  const policy = p.takeover;
+  const history = p.valueHistory || [];
+  const isPrivate = p.building?.kind === "private";
   const canUpgrade =
     owned &&
     !!onUpgrade &&
-    p.building?.kind === "private" &&
+    isPrivate &&
     tier !== "SKYSCRAPER" &&
     tier !== "LANDMARK";
-  const upgrade = canUpgrade && (
-    <button className="button outline wide" onClick={onUpgrade}>
-      <TrendingUp size={16} />
-      Mejorar edificio
-    </button>
-  );
+  const arch = architectureOf(p.districtId);
+  const free = !p.building && !site;
   return (
-    <aside className="property-panel" aria-label="Solar seleccionado">
-      <div className="panel-top">
-        <span className="eyebrow">
-          {p.building
-            ? p.building.kind === "public"
-              ? "EDIFICIO DE LA CIUDAD"
-              : `EDIFICIO ${tier}`
-            : site
-              ? "PARCELA PREMIUM"
-              : p.name.toUpperCase()}
-        </span>
-        <button
-          className="icon-button"
-          onClick={onClose}
-          aria-label="Cerrar ficha"
-        >
-          <X size={18} />
-        </button>
-      </div>
-      {p.ad ? (
-        <div className="panel-brand-header">
-          <span
-            className="panel-brand-avatar"
-            style={{ background: p.ad.primary + "18", color: p.ad.primary }}
-          >
-            {p.ad.logo ? (
-              <img src={p.ad.logo} alt="" />
-            ) : (
-              p.ad.brand.slice(0, 1)
-            )}
-          </span>
-          <div>
-            <strong>{p.ad.brand}</strong>
-            <span className="panel-claimed">
-              <ShieldCheck size={13} /> Construido
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="property-art">
-          <span className={`tier ${p.tier.toLowerCase()}`}>
-            {site
-              ? `DESDE ${euro(p.price)}`
-              : p.building
-                ? p.building.kind === "public"
-                  ? "PÚBLICO"
-                  : tier
-                : `DESDE ${euro(p.price)}`}
-          </span>
-          <PropertyArt property={p} />
-          <span className={`status-pill ${p.status}`}>
-            <i />
-            {statusLabel[p.status]}
-          </span>
-        </div>
-      )}
-      <div className="panel-content">
-        <span className="eyebrow">
-          <MapPin size={12} />
-          {district?.name}
-        </span>
-        <h2 className={p.ad ? "panel-brand-title" : undefined}>
-          {p.ad?.brand || p.name}
-        </h2>
-        <p className="muted">
-          {p.ad?.description ||
-            (p.building?.kind === "public"
-              ? p.description
-              : p.building
-                ? "Este edificio ya tiene propietario."
-                : site
-                  ? "Parcela reservada para un rascacielos. Inventario premium para grandes marcas."
-                  : p.status === "reserved"
-                    ? "Alguien está construyendo aquí ahora mismo. Elige otro solar o vuelve en unos minutos."
-                    : "Construye aquí tu propio edificio.")}
-        </p>
-        <div className="property-facts">
-          <span>
-            <Eye size={15} />
-            {p.views} visitas
-          </span>
-          <span>
-            <ShieldCheck size={15} />
-            {p.building
-              ? `${p.building.floors} ${p.building.floors === 1 ? "planta" : "plantas"}`
-              : "Un solo propietario"}
-          </span>
-        </div>
-        {p.ad ? (
-          <>
-            <div className="claimed-note">
-              CONSTRUIDO POR <strong>{p.ad.brand}</strong>
-              <small>
-                Edificio {tier}
-                {tier !== "SKYSCRAPER" && tier && tier in PRESENCE
-                  ? ` · ${PRESENCE[tier as keyof typeof PRESENCE].floors}`
-                  : ""}
-              </small>
+    <aside className="sc-panel" aria-label="Solar seleccionado">
+      <button
+        className="sc-close icon-button"
+        onClick={onClose}
+        aria-label="Cerrar ficha"
+      >
+        <X size={18} />
+      </button>
+      {p.building ? (
+        <>
+          <header className="sc-head">
+            <BrandTile p={p} />
+            <div>
+              <h2>{p.ad?.brand || p.name}</h2>
+              <p>
+                <b>{tier === "SKYSCRAPER" ? "RASCACIELOS" : tier}</b> ·{" "}
+                {district?.name}
+              </p>
             </div>
-            {p.ad.website && (
-              <a
-                className="button coral wide"
-                href={p.ad.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => track("external_link_click", p.id)}
-              >
-                {p.ad.cta}
-                <ExternalLink size={16} />
-              </a>
-            )}
-            {upgrade}
+          </header>
+          <span className="sc-sr">
+            {p.building.kind === "public"
+              ? "EDIFICIO DE LA CIUDAD"
+              : `EDIFICIO ${tier}`}
+          </span>
+          <p className="sc-desc">
+            {p.ad?.description ||
+              (p.building.kind === "public"
+                ? p.description
+                : "Este edificio ya tiene propietario.")}
+          </p>
+          <dl className="sc-stats">
+            <div>
+              <dt>Visitas</dt>
+              <dd>{count(p.views)}</dd>
+            </div>
+            <div>
+              <dt>{isPrivate ? "Valor actual" : "Estado"}</dt>
+              <dd>
+                {isPrivate
+                  ? euro(p.current_property_value ?? 0)
+                  : statusLabel[p.status]}
+              </dd>
+            </div>
+          </dl>
+          {isPrivate && history.length > 0 && <ValueHistory steps={history} />}
+          {isPrivate && !history.length && (
+            <p className="sc-note">
+              Sin pagos registrados para esta ubicación todavía.
+            </p>
+          )}
+          {canUpgrade && (
+            <button className="sc-cta light" onClick={onUpgrade}>
+              <TrendingUp size={16} />
+              Mejorar edificio
+            </button>
+          )}
+          {isPrivate && policy?.eligible && !owned && policy.open && (
+            <TakeoverAction key={p.id} p={p} demo={demo} />
+          )}
+          {isPrivate && policy?.eligible && (
+            <div className="sc-info">
+              {policy.reason === "PROTEGIDO" ? (
+                <p>
+                  <ShieldCheck size={14} /> <b>PROTEGIDO</b>
+                  {p.protection_until &&
+                    ` hasta ${new Date(p.protection_until).toLocaleString(
+                      "es-ES",
+                      {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )}`}
+                  . Cualquier usuario puede superar este valor cuando termine el
+                  periodo de protección.
+                </p>
+              ) : owned ? (
+                <p>
+                  Cualquier usuario puede superar este valor cuando termine el
+                  periodo de protección.
+                </p>
+              ) : (
+                <p>
+                  <b>Takeover en una frase:</b>{" "}
+                  {CONTROL_NOTICE.charAt(0).toLowerCase() +
+                    CONTROL_NOTICE.slice(1)}{" "}
+                  Tras el pago tendrás {policy.protectionHours} horas de
+                  protección.
+                </p>
+              )}
+            </div>
+          )}
+          {p.ad?.website && (
+            <a
+              className="sc-secondary"
+              href={p.ad.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track("external_link_click", p.id)}
+            >
+              {p.ad.cta}
+              <ExternalLink size={15} />
+            </a>
+          )}
+          {p.ad && (
             <div className="social-links">
               {(["instagram", "tiktok", "x", "linkedin"] as const).map(
                 (k) =>
@@ -180,30 +265,35 @@ export function PropertyPanel({
                   ),
               )}
             </div>
-            {p.ad.promo && (
-              <p className="promo-code">
-                Usa el código: <strong>{p.ad.promo}</strong>
-              </p>
-            )}
-          </>
-        ) : p.building ? (
-          <>
-            <div className="claimed-note">
-              {p.building.kind === "public"
-                ? "EDIFICIO PÚBLICO"
-                : "EDIFICIO PRIVADO"}
-              <small>
-                {p.building.kind === "public"
-                  ? "Forma parte de la ciudad. No está a la venta."
-                  : "Su propietario lo está preparando."}
-              </small>
-            </div>
-            {upgrade}
-          </>
-        ) : p.status === "auction" ? (
-          <>
-            <div className="price-row">
-              <div>
+          )}
+          {p.ad?.promo && (
+            <p className="promo-code">
+              Usa el código: <strong>{p.ad.promo}</strong>
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <span className="sc-eyebrow">
+            {site ? "PARCELA PREMIUM" : p.name.toUpperCase()}
+          </span>
+          <h2 className="sc-title">{p.name}</h2>
+          <p className="sc-meta">
+            {district?.name} ·{" "}
+            <span className={`sc-status ${p.status}`}>
+              {statusLabel[p.status]}
+            </span>
+          </p>
+          <p className="sc-desc">
+            {site
+              ? "Parcela reservada para un rascacielos. Inventario premium para grandes marcas."
+              : p.status === "reserved"
+                ? "Alguien está construyendo aquí ahora mismo. Elige otro solar o vuelve en unos minutos."
+                : "Construye aquí tu propio edificio."}
+          </p>
+          {p.status === "auction" ? (
+            <>
+              <div className="sc-price">
                 <small>
                   {p.auction?.currentBid ? "Puja actual" : "Puja inicial"}
                 </small>
@@ -211,61 +301,63 @@ export function PropertyPanel({
                   {euro(p.auction?.currentBid || p.auction?.nextBid || 0)}
                 </strong>
               </div>
-              <span className="tag gold">Subasta</span>
-            </div>
-            <Link
-              href={`/auctions?property=${p.id}`}
-              className="button coral wide"
-            >
-              Ver subasta <ArrowUpRight size={18} />
-            </Link>
-          </>
-        ) : (
-          <>
-            <div className="price-row">
-              <div>
+              <Link href={`/auctions?property=${p.id}`} className="sc-cta">
+                Ver subasta <ArrowUpRight size={18} />
+              </Link>
+            </>
+          ) : (
+            <>
+              <div className="sc-price">
                 <small>{site ? "Precio orientativo" : "Desde"}</small>
                 <strong>{euro(p.price)}</strong>
               </div>
-              <span className="tag">
-                {site ? "Inventario premium" : "Pago único"}
-              </span>
-            </div>
-            <button
-              disabled={p.status !== "available"}
-              className="button coral wide"
-              onClick={onClaim}
-            >
-              {p.status === "reserved"
-                ? site
-                  ? siteNote(p).charAt(0) + siteNote(p).slice(1).toLowerCase()
-                  : "Reservado temporalmente"
-                : site
-                  ? "Construir rascacielos"
-                  : "CONSTRUIR AQUÍ"}
-              {p.status === "available" ? (
-                <Hammer size={17} />
-              ) : (
-                <ArrowUpRight size={18} />
-              )}
-            </button>
-            <div className="microcopy">
-              <Clock size={12} />
-              Pago único · Sin registro
-            </div>
-          </>
-        )}
-        <TakeoverCard key={p.id} property={p} owned={owned} demo={demo} />
-        <div className="panel-footer">
-          <Link href={propertyUrl(p)}>
-            {p.building ? "Ver página del edificio" : "Ver página del solar"}{" "}
-            <ArrowUpRight size={13} />
-          </Link>
-          <button onClick={onShare} aria-label="Compartir">
-            <Share2 size={15} />
-          </button>
-        </div>
-      </div>
+              <button
+                disabled={p.status !== "available"}
+                className="sc-cta orange"
+                onClick={onClaim}
+              >
+                {p.status === "reserved"
+                  ? site
+                    ? siteNote(p).charAt(0) + siteNote(p).slice(1).toLowerCase()
+                    : "Reservado temporalmente"
+                  : site
+                    ? "Construir rascacielos"
+                    : "CONSTRUIR AQUÍ"}
+                {p.status === "available" && <Hammer size={17} />}
+              </button>
+              <p className="sc-micro">Pago único · Sin registro</p>
+            </>
+          )}
+          {free && (
+            <section className="sc-tiers" aria-label="Tamaños de edificio">
+              <h3>Qué puedes construir aquí</h3>
+              <ol>
+                {PRESENCE_TIERS.map((t) => (
+                  <li key={t}>
+                    <TierArt
+                      tier={t}
+                      glass={arch === "corporate" || arch === "tech"}
+                      fit="row"
+                      initial="T"
+                    />
+                    <b>{t}</b>
+                    <span>{euro(PRESENCE[t].price)}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+        </>
+      )}
+      <footer className="sc-foot">
+        <Link href={propertyUrl(p)}>
+          {p.building ? "Ver página del edificio" : "Ver página del solar"}{" "}
+          <ArrowUpRight size={13} />
+        </Link>
+        <button onClick={onShare} aria-label="Compartir">
+          <Share2 size={15} />
+        </button>
+      </footer>
     </aside>
   );
 }

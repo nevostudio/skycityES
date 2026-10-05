@@ -33,9 +33,11 @@ test("CASE A–D in the browser: build on the map, grow STARTER → PRO paying 1
   await expect(panel).toContainText("Construye aquí tu propio edificio.");
   await expect(panel).toContainText("Pago único · Sin registro");
   await panel.getByRole("button", { name: "CONSTRUIR AQUÍ" }).click();
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page
     .getByRole("textbox", { name: "Nombre de la marca", exact: true })
     .fill("Growing Studio");
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
   await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await page
@@ -55,6 +57,7 @@ test("CASE A–D in the browser: build on the map, grow STARTER → PRO paying 1
   await panel.getByRole("button", { name: "Mejorar edificio" }).click();
   await page.locator('input[name="presence"][value="PRO"]').check();
   await expect(page.getByText(/^Pagas 12\s€$/)).toBeVisible();
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("button", { name: /Mejorar por 12\s€/ }).click();
   snapshot = await (await request.get("/api/city")).json();
   expect(

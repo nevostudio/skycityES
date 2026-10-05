@@ -21,8 +21,7 @@ import type {
 import { Header } from "../header";
 import { Login } from "./login";
 import { api, euro, shortDate } from "@/lib/client";
-import { withBuilding } from "@/lib/presence";
-import { BuildingArt } from "../property/building-art";
+import { TierArt } from "../property/tier-art";
 import { ShareModal } from "../property/share-modal";
 import { ClaimModal } from "../checkout/claim-modal";
 import { Modal } from "../modal";
@@ -128,9 +127,12 @@ export function Dashboard({ initial }: { initial: CityData }) {
               const clicks = l.analytics.external_link_click || 0;
               return (
                 <article className="lease-card" key={l.id}>
-                  <BuildingArt
-                    property={withBuilding(l.property, tier)}
-                    brand={l.ad.brand}
+                  <TierArt
+                    tier={tier}
+                    color={l.ad.primary}
+                    initial={l.ad.brand}
+                    fit="single"
+                    label={`Edificio ${tier} de ${l.ad.brand}`}
                   />
                   <div className="lease-details">
                     <span className="eyebrow">

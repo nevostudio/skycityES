@@ -2,9 +2,10 @@
 import { useState, useEffect, useMemo, useRef, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { BrandSign } from "./brand-sign";
-import { brandTheme } from "@/lib/brand-theme";
+import { brandKind, brandTheme, tint } from "@/lib/brand-theme";
 import { districtStyle, districtWall } from "./district-style";
-import { PresenceArchitecture } from "./presence-architecture";
+import { BuildingForm } from "./architecture";
+import { architectureOf } from "@/lib/massing";
 import { presenceLevel } from "@/lib/presence";
 import { signSize } from "@/lib/branding";
 import type { ThreeEvent } from "@react-three/fiber";
@@ -13,12 +14,13 @@ import type { Ad, PublicProperty } from "@/types";
 export const box = new THREE.BoxGeometry(1, 1, 1);
 const cone = new THREE.ConeGeometry(1, 1, 4);
 export const outline = new THREE.EdgesGeometry(box);
-export const leaf = new THREE.IcosahedronGeometry(1, 0);
+export const leaf = new THREE.IcosahedronGeometry(1, 1);
+/** PDF diorama palette: cream board, light warm roads, calm river. */
 export const palette = {
-  road: "#737e78",
-  line: "#e6e4d7",
-  ground: "#adbc9c",
-  water: "#74acae",
+  road: "#d4cec2",
+  line: "#fbf8f1",
+  ground: "#e7e0cf",
+  water: "#a6c9c5",
 };
 /** Plot → foundations → structure → growth → finished building. */
 export const BUILD_ANIMATION_MS = 1600;
@@ -74,8 +76,8 @@ export function SelectionFrame({
             key={`${x}:${z}`}
             position={[x * (w / 2 + 0.11), h / 2, z * (d / 2 + 0.11)]}
           >
-            <boxGeometry args={[0.055, h, 0.055]} />
-            <meshBasicMaterial color="#ffc060" toneMapped={false} />
+            <boxGeometry args={[0.04, h, 0.04]} />
+            <meshBasicMaterial color="#e8663a" toneMapped={false} />
           </mesh>
         )),
       )}
@@ -84,12 +86,12 @@ export function SelectionFrame({
           {[-1, 1].map((side) => (
             <group key={side}>
               <mesh position={[0, 0, side * (d / 2 + 0.11)]}>
-                <boxGeometry args={[w + 0.3, 0.075, 0.075]} />
-                <meshBasicMaterial color="#ffc060" toneMapped={false} />
+                <boxGeometry args={[w + 0.3, 0.045, 0.045]} />
+                <meshBasicMaterial color="#e8663a" toneMapped={false} />
               </mesh>
               <mesh position={[side * (w / 2 + 0.11), 0, 0]}>
-                <boxGeometry args={[0.075, 0.075, d + 0.3]} />
-                <meshBasicMaterial color="#ffc060" toneMapped={false} />
+                <boxGeometry args={[0.045, 0.045, d + 0.3]} />
+                <meshBasicMaterial color="#e8663a" toneMapped={false} />
               </mesh>
             </group>
           ))}
@@ -298,14 +300,20 @@ export const Building = memo(function Building({
             : p.type === "house" && level <= 1
               ? 1.3
               : 0.9);
+  // PDF page 3: the district sets the material; the brand shows through its sign and one
+  // secondary element. Only leisure facades and curated demo brands take the brand colour.
+  const arch = architectureOf(p.districtId);
+  const curated = !!p.ad && brandKind(p.ad) !== "custom";
   const color = muted
-    ? "#c8cebf"
+    ? "#d6d8cf"
     : civic
       ? p.color
-      : p.ad
-        ? brandTheme(p.ad).background
-        : districtWall(p);
-  const plain = !p.ad && !civic;
+      : curated
+        ? brandTheme(p.ad!).background
+        : arch === "leisure" && p.ad
+          ? tint(p.ad.primary, 0.32)
+          : districtWall(p);
+  const accent = p.ad?.primary ?? district.trim;
   function enter(e: ThreeEvent<PointerEvent>) {
     e.stopPropagation();
     setHover(true);
@@ -331,8 +339,12 @@ export const Building = memo(function Building({
     >
       {(selected || hover) && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
-          <planeGeometry args={[w + 1.5, d + 1.5]} />
-          <meshBasicMaterial color={selected ? "#e97e51" : "#f6dba2"} />
+          <planeGeometry args={[w + 1.2, d + 1.2]} />
+          <meshBasicMaterial
+            color={selected ? "#e8663a" : "#fbf8f1"}
+            transparent
+            opacity={selected ? 0.35 : 0.8}
+          />
         </mesh>
       )}
       {building && (
@@ -357,18 +369,7 @@ export const Building = memo(function Building({
         </group>
       )}
       <group ref={growth} scale={[1, construction ? 0.002 : 1, 1]}>
-        <Block position={[0, h / 2, 0]} scale={[w, h, d]} color={color} />
-        <PresenceArchitecture p={p} />
-        {/* Owned buildings get a crisp contour so they lead the image over the grid. */}
-        {p.ad && !muted && !faded && (
-          <lineSegments
-            geometry={outline}
-            position={[0, h / 2, 0]}
-            scale={[w + 0.02, h + 0.02, d + 0.02]}
-          >
-            <lineBasicMaterial color="#25342e" transparent opacity={0.55} />
-          </lineSegments>
-        )}
+        <BuildingForm p={p} wall={color} accent={accent} muted={muted} />
         {(selected || hover) && (
           <lineSegments
             geometry={outline}
@@ -376,140 +377,11 @@ export const Building = memo(function Building({
             scale={[w + 0.12, h + 0.14, d + 0.12]}
           >
             <lineBasicMaterial
-              color={selected ? "#f2a266" : "#94d69a"}
+              color={selected ? "#e8663a" : "#7fa36f"}
               linewidth={2}
               toneMapped={false}
             />
           </lineSegments>
-        )}
-        <Block
-          position={[0, h + 0.12, 0]}
-          scale={[w + 0.15, 0.24, d + 0.15]}
-          color={p.ad ? brandTheme(p.ad).accent : district.roof}
-        />
-        {p.type === "house" && level <= 1 && !civic && !p.ad ? (
-          <mesh
-            geometry={cone}
-            position={[0, h + 0.65, 0]}
-            scale={[w * 0.78, 1.25, d * 0.76]}
-            rotation={[0, Math.PI / 4, 0]}
-            castShadow
-          >
-            <meshStandardMaterial color={district.roof} />
-          </mesh>
-        ) : (
-          <>
-            {!p.ad && (
-              <Block
-                position={[-w * 0.14, h + 0.45, 0]}
-                scale={[w * 0.45, 0.7, d * 0.45]}
-                color="#c3c5b8"
-              />
-            )}
-            {h > 10 && plain && (
-              <Block
-                position={[0, h + 1.8, 0]}
-                scale={[0.15, 3, 0.15]}
-                color="#778c86"
-              />
-            )}
-          </>
-        )}
-        {plain &&
-        (p.type === "shop" ||
-          p.type === "restaurant" ||
-          p.type === "nightclub") ? (
-          <>
-            <Block
-              position={[0, 1, d / 2 + 0.02]}
-              scale={[w * 0.8, 1.65, 0.1]}
-              color="#5d7d71"
-            />
-            <Block
-              position={[0, 1.9, d / 2 + 0.3]}
-              scale={[w + 0.15, 0.27, 0.7]}
-              color={district.trim}
-            />
-          </>
-        ) : null}
-        {plain && p.model % 4 === 0 && h > 5 && (
-          <Block
-            position={[w / 2 + 0.09, h / 2, 0]}
-            scale={[0.2, h, d * 0.76]}
-            color="#e5e4d9"
-          />
-        )}
-        {plain && p.type !== "house" && p.model % 5 === 1 && (
-          <Block
-            position={[0, h + 0.8, 0]}
-            scale={[w * 0.75, 1.4, d * 0.75]}
-            color={color}
-          />
-        )}
-        {plain && p.type !== "house" && p.model % 5 === 2 && (
-          <>
-            <Block
-              position={[-w * 0.25, h + 0.5, 0]}
-              scale={[w * 0.35, 0.8, d * 0.8]}
-              color="#719198"
-            />
-            <Block
-              position={[w * 0.25, h + 0.5, 0]}
-              scale={[w * 0.35, 0.8, d * 0.8]}
-              color="#719198"
-            />
-          </>
-        )}
-        {plain && p.type !== "house" && p.model % 5 === 3 && (
-          <Block
-            position={[0, h + 0.35, 0]}
-            scale={[w * 0.8, 0.5, d * 0.8]}
-            color="#91a981"
-          />
-        )}
-        {plain && p.type !== "house" && p.model % 5 === 4 && (
-          <mesh
-            geometry={cone}
-            position={[0, h + 1, 0]}
-            scale={[w * 0.7, 2, d * 0.7]}
-            rotation={[0, Math.PI / 4, 0]}
-            castShadow
-          >
-            <meshStandardMaterial color="#9fae9b" />
-          </mesh>
-        )}
-        {(plain || civic) &&
-          p.model >= 5 &&
-          p.model < 10 &&
-          h > 5 &&
-          [0.3, 0.6, 0.9].map((y) => (
-            <Block
-              key={y}
-              position={[0, h * y, 0]}
-              scale={[w + 0.12, 0.15, d + 0.12]}
-              color="#e9e8da"
-            />
-          ))}
-        {plain && p.model >= 10 && p.model < 15 && (
-          <Block
-            position={[0, h * 0.5, d / 2 + 0.06]}
-            scale={[w * 0.18, h * 0.8, 0.12]}
-            color="#779597"
-          />
-        )}
-        {(plain || civic) && p.model >= 15 && (
-          <>
-            <Block
-              position={[-w * 0.44, h * 0.5, d / 2 + 0.08]}
-              scale={[0.17, h, 0.18]}
-              color="#e9e6d5"
-            />
-            <Block
-              position={[w * 0.44, h * 0.5, d / 2 + 0.08]}
-              scale={[0.17, h, 0.18]}
-              color="#e9e6d5"
-            />
-          </>
         )}
         {civic && !p.ad && <CivicDetails p={p} />}
         {p.ad && !faded && (

@@ -43,32 +43,32 @@ export function NeighborhoodDetails({
           add(
             [d.x + x, 3.48, z],
             [old ? 0.32 : 0.5, 0.14, 0.28],
-            night ? "#c698d0" : business ? "#c7d9dd" : "#f5dda8",
+            night ? "#f1d9c8" : business ? "#e3ecec" : "#f5e6c4",
           );
           add(
             [d.x + x + 1, 0.55, z],
             [1.2, 0.14, 0.4],
-            old ? "#a7805a" : style.trim,
+            old ? "#a7805a" : "#c9ab84",
           );
           add([d.x + x + 0.65, 0.35, z], [0.1, 0.4, 0.35], "#758376");
           add([d.x + x + 1.35, 0.35, z], [0.1, 0.4, 0.35], "#758376");
         }
         if (residential)
           for (let x = -13; x < 14; x += 3)
-            add([d.x + x, 0.65, d.z + side * 13.5], [1.9, 0.7, 0.5], "#7f9b61");
+            add([d.x + x, 0.65, d.z + side * 13.5], [1.9, 0.7, 0.5], "#a3be8c");
         if (night)
           for (let x = -12; x < 13; x += 4)
             add(
               [d.x + x, 0.36, d.z + side * 13.7],
               [2.2, 0.04, 0.13],
-              x % 8 ? "#ab91bc" : "#84bbb9",
+              x % 8 ? "#ece2dc" : "#c6dad6",
             );
         if (old)
           for (let x = -13; x < 14; x += 1.3)
             add(
               [d.x + x, 0.355, d.z + side * 12.9],
               [0.035, 0.015, 1.7],
-              "#c5b094",
+              "#e3d6bd",
             );
       }
       if (business) {
@@ -97,17 +97,17 @@ export function NeighborhoodDetails({
           continue;
         const variant = (i + districtIndex) % 3;
         if (variant === 0) {
-          add([x, 0.39, z], [3.5, 0.08, 3.9], "#9eb68a");
+          add([x, 0.39, z], [3.5, 0.08, 3.9], "#c9d8b3");
           add([x - 1.15, 0.72, z - 1.3], [0.7, 0.58, 0.7], style.trees);
           add([x + 1.05, 0.66, z + 1.15], [0.8, 0.48, 0.8], style.trees);
-          add([x, 0.55, z], [1.4, 0.14, 0.42], "#a8815c");
+          add([x, 0.55, z], [1.4, 0.14, 0.42], "#c9ab84");
         } else if (variant === 1) {
-          add([x, 0.39, z], [3.55, 0.08, 3.95], "#858d87");
+          add([x, 0.39, z], [3.55, 0.08, 3.95], "#ddd8cd");
           for (const side of [-1, 0, 1])
-            add([x + side * 1.05, 0.445, z], [0.055, 0.018, 3.1], "#e7e2ce");
-          add([x, 0.58, z - 1.6], [2.6, 0.28, 0.35], "#78906f");
+            add([x + side * 1.05, 0.445, z], [0.055, 0.018, 3.1], "#fbf8f1");
+          add([x, 0.58, z - 1.6], [2.6, 0.28, 0.35], "#a9c08f");
         } else {
-          add([x, 0.4, z], [3.5, 0.1, 3.9], "#d8d1bc");
+          add([x, 0.4, z], [3.5, 0.1, 3.9], "#ece5d4");
           add([x, 0.53, z], [2.5, 0.08, 0.45], style.trim);
           add([x - 1.25, 0.68, z + 1.25], [0.55, 0.52, 0.55], style.trees);
           add([x + 1.25, 0.68, z - 1.25], [0.55, 0.52, 0.55], style.trees);

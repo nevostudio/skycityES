@@ -97,6 +97,7 @@ test("brand editor: upload a transparent logo, phrase and colors; branding persi
   const email = `editor-${Date.now()}@skycity.demo`;
   await page.goto(`/?building=${plot.id}`);
   await page.getByRole("button", { name: "CONSTRUIR AQUÍ" }).click();
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page
     .getByRole("textbox", { name: "Nombre de la marca", exact: true })
     .fill("Transparente Co");
@@ -110,6 +111,7 @@ test("brand editor: upload a transparent logo, phrase and colors; branding persi
   await expect(
     page.getByRole("img", { name: /Vista previa del cartel/ }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("textbox", { name: /Tu email/ }).fill(email);
   await page.getByRole("button", { name: /Construir por 3\s€/ }).click();
   await page

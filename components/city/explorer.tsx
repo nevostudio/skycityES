@@ -275,9 +275,7 @@ export function Explorer({
                 UNA CIUDAD POR CONSTRUIR
               </div>
               <h1>
-                Construye tu marca
-                <br />
-                en el mapa<span>.</span>
+                Construye tu marca en el mapa<span>.</span>
               </h1>
               <p>
                 Elige un solar y levanta tu edificio desde{" "}

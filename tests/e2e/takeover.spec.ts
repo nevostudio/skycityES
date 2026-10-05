@@ -84,6 +84,7 @@ test("automatic takeover: visible terms, unchanged PRO building, concurrent paym
     await dialog
       .getByRole("textbox", { name: "Nombre de la marca", exact: true })
       .fill("New Takeover Brand");
+    await dialog.getByRole("button", { name: "Continuar" }).click();
     await dialog
       .getByRole("textbox", { name: /Tu email/ })
       .fill("takeover-new@example.com");
