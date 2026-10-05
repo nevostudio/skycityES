@@ -90,9 +90,18 @@ export function Admin({ demo }: { demo: boolean }) {
     setBusy(true);
     setError("");
     try {
-      await api("/api/admin", body);
+      const result = await api<{ mail?: { sent: number; mode: string } }>(
+        "/api/admin",
+        body,
+      );
       await load();
-      setMessage("Cambios guardados.");
+      setMessage(
+        result?.mail
+          ? result.mail.mode === "resend"
+            ? `Mantenimiento hecho · ${result.mail.sent} correos enviados.`
+            : "Mantenimiento hecho · los correos quedan en la cola (sin proveedor de email)."
+          : "Cambios guardados.",
+      );
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -663,7 +672,7 @@ export function Admin({ demo }: { demo: boolean }) {
                   onClick={() => action({ action: "maintenance" })}
                 >
                   <RefreshCw size={14} />
-                  Procesar reservas caducadas y subastas
+                  Ejecutar mantenimiento (reservas y correos)
                 </button>
               </form>
             )}

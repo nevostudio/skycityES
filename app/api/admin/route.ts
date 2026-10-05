@@ -17,6 +17,7 @@ import { PLOT_HEIGHT } from "@/lib/presence";
 import type { Ad } from "@/types";
 import { validMoney } from "@/lib/takeover-policy";
 import { AUCTIONS_ENABLED } from "@/lib/features";
+import { flushMail } from "@/lib/email";
 const propertySchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2).max(80),
@@ -267,6 +268,9 @@ export async function POST(req: Request) {
         closeAuctions(s, isDemo(), appUrl());
       } else throw new DomainError("Acción desconocida");
     });
+    // Maintenance also delivers the email queue, like the scheduled cron.
+    if (input.action === "maintenance")
+      return Response.json({ ok: true, mail: await flushMail() });
     return Response.json({ ok: true });
   } catch (e) {
     return fail(e);
