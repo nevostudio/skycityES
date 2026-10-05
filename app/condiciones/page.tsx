@@ -66,7 +66,9 @@ export default function Page() {
       <ul>
         <li>
           Cada ubicación tiene un <strong>valor actual</strong>: el último
-          importe que se pagó para obtenerla.
+          importe que se pagó para obtenerla. En los edificios que gestiona
+          SkyCity, que se muestran como «Destacadas por SkyCity», es el valor de
+          salida que fija SkyCity; su ficha indica que no hay pagos registrados.
         </li>
         <li>
           Después de comprar, tu ubicación queda{" "}
