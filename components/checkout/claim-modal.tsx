@@ -219,7 +219,7 @@ export function ClaimModal({
               {takeover ? "Tu oferta" : upgradeLeaseId ? "Pagas" : "Total"}
             </small>
             <strong>{euro(amount)}</strong>
-            <span>Pago único</span>
+            <span>Pago único · IVA incluido</span>
           </div>
           {/* Every location, skyscrapers included, can change hands. */}
           <div className="takeover-notice">

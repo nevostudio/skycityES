@@ -39,9 +39,10 @@ export default function Page() {
         </li>
       </ul>
       <p>
-        No hay suscripciones ni renovaciones. Puedes hacer crecer tu edificio a
-        un tamaño superior pagando solo la diferencia de precio. El importe
-        final que pagas se muestra siempre antes de ir al pago.
+        Todos los precios son finales, en euros y con el IVA incluido. No hay
+        suscripciones ni renovaciones. Puedes hacer crecer tu edificio a un
+        tamaño superior pagando solo la diferencia de precio. El importe final
+        que pagas se muestra siempre antes de ir al pago.
       </p>
 
       <h2>3. Pago y confirmación</h2>
