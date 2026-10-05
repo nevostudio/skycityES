@@ -20,14 +20,13 @@ export function takeoverState(s: State, p: Property, now = Date.now()) {
   );
   const eligible = !!(
     p.enabled &&
-    p.inventory === "normal" &&
+    (p.inventory === "normal" || p.inventory === "skyscraper") &&
     !p.reservedForBrands &&
     p.sale === "rental" &&
     p.takeover_enabled &&
     !p.takeover_blocked &&
     s.settings[0].takeoverEnabled &&
     b?.kind === "private" &&
-    b.tier !== "SKYSCRAPER" &&
     lease &&
     b.leaseId === lease.id
   );
@@ -94,7 +93,7 @@ export function migrateTakeovers(s: State) {
       )
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
     p.current_property_value ??= paid?.amount ?? 0;
-    p.takeover_enabled ??= p.inventory === "normal";
+    p.takeover_enabled ??= p.inventory !== "public";
     p.takeover_blocked ??= false;
     p.control_version ??= 0;
     p.takeover_count ??= 0;

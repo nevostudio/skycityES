@@ -16,6 +16,7 @@ import { assignSkyscraper } from "@/lib/admin-inventory";
 import { PLOT_HEIGHT } from "@/lib/presence";
 import type { Ad } from "@/types";
 import { validMoney } from "@/lib/takeover-policy";
+import { AUCTIONS_ENABLED } from "@/lib/features";
 const propertySchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2).max(80),
@@ -102,6 +103,12 @@ export async function POST(req: Request) {
           throw new DomainError(
             "Los edificios públicos forman parte del trazado inicial de la ciudad.",
           );
+        if (
+          p.sale === "auction" &&
+          !AUCTIONS_ENABLED &&
+          prev?.sale !== "auction"
+        )
+          throw new DomainError("Las subastas no están disponibles.");
         if (p.inventory !== "skyscraper") {
           p.price = 3;
           p.reservedForBrands = false;
@@ -198,6 +205,8 @@ export async function POST(req: Request) {
           .parse(input.settings);
         Object.assign(s.settings[0], settings);
       } else if (input.action === "auction") {
+        if (!AUCTIONS_ENABLED)
+          throw new DomainError("Las subastas no están disponibles.");
         const property = s.properties.find((p) => p.id === input.propertyId);
         if (
           !property ||

@@ -25,12 +25,13 @@ import { Header } from "../header";
 import { Login } from "../dashboard/login";
 import { PropertyEditor } from "./property-editor";
 import { api, euro, shortDate } from "@/lib/client";
+import { AUCTIONS_ENABLED } from "@/lib/features";
 const tabs = [
   "Solares",
   "Barrios",
   "Edificios y anuncios",
-  "Subastas",
-  "Pujas",
+  // Auctions are retired: their tabs only show while the feature is on.
+  ...(AUCTIONS_ENABLED ? ["Subastas", "Pujas"] : []),
   "Clientes",
   "Transacciones",
   "Takeovers",
@@ -163,7 +164,9 @@ export function Admin({ demo }: { demo: boolean }) {
                 ["Solares disponibles", data.stats.available],
                 ["Construidos hoy", data.stats.builtToday],
                 ["Propietarios", data.stats.owners],
-                ["Subastas activas", data.stats.auctions],
+                ...(AUCTIONS_ENABLED
+                  ? [["Subastas activas", data.stats.auctions]]
+                  : []),
                 ["Clics externos", data.clicks],
               ].map(([label, value]) => (
                 <div key={label}>

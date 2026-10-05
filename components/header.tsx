@@ -5,6 +5,7 @@ import { ArrowUpRight, Building2, Plus } from "lucide-react";
 import { Brand } from "./brand";
 import type { CityMetrics as Metrics } from "@/types";
 import { CityMetrics } from "./city/city-metrics";
+import { AUCTIONS_ENABLED } from "@/lib/features";
 export function Header({
   demo = true,
   onClaim,
@@ -26,13 +27,15 @@ export function Header({
           <Link className={pathname === "/" ? "active" : ""} href="/">
             Explorar
           </Link>
-          <Link
-            className={pathname === "/auctions" ? "active" : ""}
-            href="/auctions"
-          >
-            Subastas
-            <span className="nav-dot" />
-          </Link>
+          {AUCTIONS_ENABLED && (
+            <Link
+              className={pathname === "/auctions" ? "active" : ""}
+              href="/auctions"
+            >
+              Subastas
+              <span className="nav-dot" />
+            </Link>
+          )}
           <Link
             className={pathname === "/my-buildings" ? "active" : ""}
             href="/my-buildings"

@@ -7,6 +7,8 @@ import { migratePresence } from "./presence";
 import { migrateBranding, migratePlots } from "./plots";
 import { migrateInventory } from "./inventory";
 import { migrateTakeovers } from "./takeover-policy";
+import { migrateSkyscraperSales } from "./skyscraper-sales";
+import { AUCTIONS_ENABLED } from "./features";
 import { isDemo } from "./config";
 import type { State } from "@/types";
 
@@ -58,11 +60,14 @@ const isCurrent = (s: State) =>
   s.settings[0].plotsVersion === 1 &&
   s.settings[0].brandingVersion === 1 &&
   s.settings[0].inventoryVersion === 1 &&
-  s.settings[0].takeoverVersion === 1;
+  s.settings[0].takeoverVersion === 1 &&
+  (AUCTIONS_ENABLED || s.settings[0].skyscraperSalesVersion === 1);
 /** Versioned, additive migrations applied inside the write transaction. */
 export const migrate = (s: State) =>
-  migrateTakeovers(
-    migrateInventory(migrateBranding(migratePlots(migratePresence(s)))),
+  migrateSkyscraperSales(
+    migrateTakeovers(
+      migrateInventory(migrateBranding(migratePlots(migratePresence(s)))),
+    ),
   );
 /** All economic writes serialize inside a database transaction. No browser state is authoritative. */
 export async function transaction<T>(fn: (state: State) => T): Promise<T> {

@@ -62,11 +62,11 @@ test("fullscreen city: plots, brands, focus, neighborhoods, directory and pages"
     page.getByRole("region", { name: "Directorio de solares" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Cerrar directorio" }).click();
-  // Auctions and My buildings stay available as pages, with their own navigation.
-  await page.goto("/auctions");
-  await page.getByRole("link", { name: "Explorar", exact: true }).click();
-  await expect(page.locator("canvas")).toBeVisible();
+  // My buildings stays available as a page with its own navigation; auctions are retired.
   await page.goto("/my-buildings");
   await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Subastas" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Explorar", exact: true }).click();
+  await expect(page.locator("canvas")).toBeVisible();
   expect(errors).toEqual([]);
 });

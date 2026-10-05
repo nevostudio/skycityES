@@ -8,6 +8,7 @@ import { citySnapshot, fulfill, reserve, sweep } from "../lib/engine";
 import { buildingFloors } from "../lib/presence";
 import { migratePlots, PUBLIC_BUILDINGS } from "../lib/plots";
 import type { Lease, State } from "../types";
+import { withLegacyAuctions } from "./support";
 
 const now = Date.parse("2026-10-04T12:00:00Z");
 const plot = "building-42";
@@ -21,7 +22,7 @@ const snap = (s: State, at = now) =>
 
 /** A city as it was before phase 1: 30-day leases on generic buildings. */
 function legacyState(): State {
-  const s = makeSeed(false, now);
+  const s = withLegacyAuctions(makeSeed(false, now), now);
   delete (s as Partial<State>).buildings;
   // Recreate locations present in a pre-inventory-reduction database.
   const base = s.properties.find((p) => p.id === "building-1")!;

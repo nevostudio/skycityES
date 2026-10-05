@@ -164,13 +164,9 @@ test("F/G: protection, public/admin, reserved, skyscrapers and disabled controls
     () => reserveTakeover(s, input, true, now + day - 1),
     /PROTEGIDO/,
   );
-  for (const inventory of ["public", "skyscraper"] as const) {
-    p.inventory = inventory;
-    assert.throws(
-      () => reserveTakeover(s, input, true, now + day),
-      /disponible/,
-    );
-  }
+  // Public buildings never change hands (skyscrapers do, like normal plots).
+  p.inventory = "public";
+  assert.throws(() => reserveTakeover(s, input, true, now + day), /disponible/);
   p.inventory = "normal";
   for (const flag of ["reservedForBrands", "takeover_blocked"] as const) {
     p[flag] = true;
@@ -213,7 +209,7 @@ test("webhook revalidates value, control version, protection, global/property sw
     if (change === "global") s.settings[0].takeoverEnabled = false;
     if (change === "enabled") p.takeover_enabled = false;
     if (change === "blocked") p.takeover_blocked = true;
-    if (change === "inventory") p.inventory = "skyscraper";
+    if (change === "inventory") p.inventory = "public";
     settleStripeSession(s, session(r, change === "amount" ? 6 : 5), at);
     assert.equal(s.propertyTakeovers[0].status, "refund_pending", change);
     assert.equal(

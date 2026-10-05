@@ -252,6 +252,8 @@ export type Settings = {
   brandingVersion?: number;
   inventoryVersion?: number;
   takeoverVersion?: number;
+  /** Auctions retired: skyscrapers on sale at a fixed price (see lib/skyscraper-sales). */
+  skyscraperSalesVersion?: number;
   takeoverEnabled?: boolean;
   takeoverMinimumIncrement?: number;
   takeoverProtectionHours?: number;

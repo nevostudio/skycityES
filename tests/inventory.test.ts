@@ -33,7 +33,8 @@ test("launch inventory has 80 normal/public locations plus 8 premium plots", () 
       ]),
     ),
   );
-  assert.equal(city.stats.available, 70);
+  // 70 normal plots plus the 8 skyscraper plots, now sold at a fixed price.
+  assert.equal(city.stats.available, 78);
   assert.equal(city.stats.built, 10);
   assert.equal(city.stats.builtPercent, 11);
 });

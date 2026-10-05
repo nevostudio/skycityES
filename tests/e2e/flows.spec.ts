@@ -141,7 +141,7 @@ test("private APIs deny strangers; demo magic links are single-use", async ({
   expect((await request.get(link.url)).status()).toBe(403);
   expect((await request.get("/api/admin")).status()).toBe(403);
 });
-test("admin can change the premium price and moderate; signed-in customers can bid", async ({
+test("admin can change the premium price and moderate; auctions are retired", async ({
   page,
 }) => {
   await page.goto("/admin");
@@ -181,16 +181,14 @@ test("admin can change the premium price and moderate; signed-in customers can b
   await first.getByRole("button", { name: "Suspender anuncio" }).click();
   await expect(first.getByText("suspendido", { exact: true })).toBeVisible();
   await first.getByRole("button", { name: "Activar anuncio" }).click();
+  // Auctions are retired: the page sends visitors to the map and bids are refused.
+  await expect(page.getByRole("button", { name: "Subastas" })).toHaveCount(0);
   await page.goto("/auctions");
-  await page
-    .getByRole("button", { name: "Pujar", exact: false })
-    .first()
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: /Pujar ·/ })
-    .click();
-  await expect(page.getByRole("status")).toContainText("Tu puja");
+  await expect(page).toHaveURL(/\/$/);
+  const bid = await page.request.post("/api/bids", {
+    data: { auctionId: "auction-14", amount: 500 },
+  });
+  expect(bid.status()).toBe(410);
 });
 test("mobile city and bottom sheet fit without horizontal overflow", async ({
   page,

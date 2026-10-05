@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { withLegacyAuctions } from "./support";
 import { makeSeed, emptyAd } from "../lib/seed";
 import {
   reserve,
@@ -24,8 +25,9 @@ test("demo launches with scarce inventory, 10 initial buildings and honest count
   assert.equal(d.stats.publicBuilt, 6);
   assert.equal(d.stats.privateBuilt, 4);
   assert.equal(d.stats.built, 10);
-  assert.equal(d.stats.auctions, 3);
-  assert.equal(d.stats.reserved, 5);
+  // Auctions are retired: the eight skyscraper plots are on sale at a fixed price.
+  assert.equal(d.stats.auctions, 0);
+  assert.equal(d.stats.reserved, 0);
   assert.equal(
     d.stats.available +
       d.stats.privateBuilt +
@@ -120,7 +122,7 @@ test("one-time payment: buildings never expire and cannot be renewed", () => {
 });
 test("bid increments, deadlines, demo settlement builds a skyscraper, live payment gating", () => {
   for (const demo of [true, false]) {
-    const s = makeSeed(false, now);
+    const s = withLegacyAuctions(makeSeed(false, now), now);
     const a = s.auctions[0];
     placeBid(s, a.id, "a@example.com", a.startingBid, demo, now);
     assert.throws(

@@ -3,6 +3,7 @@ import type { Property, District } from "@/types";
 import type { Dispatch, SetStateAction } from "react";
 import { Modal } from "../modal";
 import { emptyAd } from "@/lib/seed";
+import { AUCTIONS_ENABLED } from "@/lib/features";
 export function PropertyEditor({
   edit,
   setEdit,
@@ -156,7 +157,9 @@ export function PropertyEditor({
               }
             >
               <option value="rental">Venta directa</option>
-              <option value="auction">Subasta</option>
+              {(AUCTIONS_ENABLED || edit.sale === "auction") && (
+                <option value="auction">Subasta</option>
+              )}
             </select>
           </label>
         </div>
@@ -208,7 +211,9 @@ export function PropertyEditor({
               >
                 <option value="available">Disponible</option>
                 <option value="reserved">Reservado para grandes marcas</option>
-                <option value="soon">Subasta próximamente</option>
+                {(AUCTIONS_ENABLED || edit.premiumNote === "auction_soon") && (
+                  <option value="soon">Subasta próximamente</option>
+                )}
               </select>
             </label>
           )}
@@ -352,9 +357,11 @@ export function PropertyEditor({
           <button className="button outline wide" disabled={busy}>
             Asignar rascacielos
           </button>
-          <p className="field-hint">
-            Para abrir pujas, usa Ayuntamiento → Subastas.
-          </p>
+          {AUCTIONS_ENABLED && (
+            <p className="field-hint">
+              Para abrir pujas, usa Ayuntamiento → Subastas.
+            </p>
+          )}
         </form>
       )}
     </Modal>

@@ -286,7 +286,9 @@ export function PropertyPanel({
           </p>
           <p className="sc-desc">
             {site
-              ? "Parcela reservada para un rascacielos. Inventario premium para grandes marcas."
+              ? p.status === "available"
+                ? "Solar para un rascacielos, a precio fijo. Como en el resto de la ciudad, otra marca podrá quedárselo más adelante pagando más."
+                : "Parcela reservada para un rascacielos. Inventario premium para grandes marcas."
               : p.status === "reserved"
                 ? "Alguien está construyendo aquí ahora mismo. Elige otro solar o vuelve en unos minutos."
                 : "Construye aquí tu propio edificio."}
@@ -308,7 +310,7 @@ export function PropertyPanel({
           ) : (
             <>
               <div className="sc-price">
-                <small>{site ? "Precio orientativo" : "Desde"}</small>
+                <small>{site ? "Precio fijo" : "Desde"}</small>
                 <strong>{euro(p.price)}</strong>
               </div>
               <button

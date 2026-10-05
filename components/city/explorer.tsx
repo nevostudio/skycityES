@@ -20,6 +20,7 @@ import { useCity } from "@/hooks/use-city";
 import { Header } from "../header";
 import { TopBrands } from "./top-brands";
 import { cityMetrics } from "@/lib/city-social";
+import { AUCTIONS_ENABLED } from "@/lib/features";
 import { DistrictSidebar } from "./district-sidebar";
 import CityScene from "./city-loader";
 import type { Construction } from "./building";
@@ -354,15 +355,17 @@ export function Explorer({
               <span>
                 <strong>{data.stats.builtPercent}%</strong> construido
               </span>
-              <button
-                onClick={() => {
-                  setFilter("Subastas");
-                  setList(true);
-                }}
-              >
-                <i className="status-dot auction" />
-                {data.stats.auctions} subastas
-              </button>
+              {AUCTIONS_ENABLED && (
+                <button
+                  onClick={() => {
+                    setFilter("Subastas");
+                    setList(true);
+                  }}
+                >
+                  <i className="status-dot auction" />
+                  {data.stats.auctions} subastas
+                </button>
+              )}
             </div>
             <button
               className="world-activity-trigger"

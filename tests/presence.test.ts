@@ -11,6 +11,7 @@ import {
   withBuilding,
 } from "../lib/presence";
 import { assignSkyscraper } from "../lib/admin-inventory";
+import { withLegacyAuctions } from "./support";
 
 const now = Date.parse("2026-10-04T12:00:00Z");
 const input = {
@@ -189,20 +190,21 @@ test("STARTER < PLUS < PRO < PREMIUM < LANDMARK << SKYSCRAPER, with the requeste
     assert.ok(buildingHeight("SKYSCRAPER", p.model) > height * 2);
   }
 });
-test("eight skyscraper plots are premium inventory: reserved or auctioned, never a 3–60 € tier", () => {
+test("eight skyscraper plots are premium inventory sold at a fixed price, never a 3–60 € tier", () => {
   const s = makeSeed(false, now);
   const major = s.properties.filter((p) => p.inventory === "skyscraper");
   assert.equal(major.length, 8);
-  assert.equal(major.filter((p) => p.reservedForBrands).length, 5);
-  assert.equal(major.filter((p) => p.sale === "auction").length, 3);
+  // Auctions are retired: every skyscraper plot is on direct sale.
+  assert.ok(major.every((p) => !p.reservedForBrands && p.sale === "rental"));
+  assert.equal(s.auctions.length, 0);
   assert.ok(major.every((p) => p.price >= 200));
   assert.ok(major.every((p) => !snap(s, p.id).building));
+  // City Hall can still hold one back for a brand.
+  s.properties.find((p) => p.id === "building-32")!.reservedForBrands = true;
   assert.throws(
     () => reserve(s, { ...input, propertyId: "building-32" }, true, now),
     /no está disponible/,
   );
-  // City Hall may release one for a direct premium purchase.
-  s.properties.find((p) => p.id === "building-50")!.reservedForBrands = false;
   const r = reserve(
     s,
     { ...input, propertyId: "building-50", presenceTier: "STARTER" },
@@ -261,6 +263,7 @@ test("manual skyscraper assignments build the tower without recording a payment"
 });
 test("pricing migration stays additive: pending checkout amounts, bids and ads are untouched", () => {
   const { s, l } = owned();
+  withLegacyAuctions(s, now);
   s.settings[0].pricingVersion = undefined;
   const before = structuredClone(l);
   s.auctions[0].startingBid = 35;

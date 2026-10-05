@@ -109,24 +109,24 @@ test("CASE A–D in the browser: build on the map, grow STARTER → PRO paying 1
   expect(errors).toEqual([]);
 });
 
-test("reserved skyscraper plot cannot be bought; admin can release, reserve, assign and open an auction", async ({
+test("skyscraper plots sell at a fixed price; admin can reserve, release and assign them", async ({
   page,
   request,
 }) => {
   const city = await (await request.get("/api/city")).json();
   const p = city.properties.find((p: { id: string }) => p.id === "building-32");
+  // On sale at its fixed price from day one.
+  expect(p.status).toBe("available");
+  expect(p.price).toBe(200);
   await page.goto(`/city/${p.districtId}/${p.id}`);
   await expect(
-    page.getByRole("button", { name: "Reservado para grandes marcas" }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Construir rascacielos" }),
+  ).toBeEnabled();
   const input = {
     propertyId: p.id,
     email: "major@example.com",
     ad: { ...emptyAd, brand: "Major Brand" },
   };
-  expect((await request.post("/api/checkout", { data: input })).status()).toBe(
-    409,
-  );
   const link = await (
     await page.request.post("/api/auth/link", {
       data: { email: "admin@skycity.demo" },
@@ -134,7 +134,19 @@ test("reserved skyscraper plot cannot be bought; admin can release, reserve, ass
   ).json();
   await page.goto(link.url);
   await page.goto("/admin");
+  // City Hall can hold a skyscraper back for a brand: it can no longer be bought.
   await page.getByRole("textbox", { name: "Buscar solares" }).fill(p.name);
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Disponibilidad", exact: true })
+    .selectOption("reserved");
+  await page
+    .getByRole("button", { name: "Guardar solar", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect((await request.post("/api/checkout", { data: input })).status()).toBe(
+    409,
+  );
   await page.getByRole("button", { name: "Editar", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Disponibilidad", exact: true })
@@ -171,19 +183,12 @@ test("reserved skyscraper plot cannot be bought; admin can release, reserve, ass
   const tower = state.properties.find((v: { id: string }) => v.id === p.id);
   expect(tower.ad.brand).toBe("Major Brand");
   expect(tower.building.tier).toBe("SKYSCRAPER");
-  await page.getByRole("button", { name: "Subastas", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Rascacielos", exact: true })
-    .selectOption("building-68");
-  await page
-    .getByRole("button", { name: "Crear subasta", exact: true })
-    .click();
-  await expect
-    .poll(async () => {
-      state = await (await request.get("/api/city")).json();
-      return state.properties.find(
-        (v: { id: string }) => v.id === "building-68",
-      ).status;
-    })
-    .toBe("auction");
+  // No auctions: City Hall has no tab to open one and the API refuses it.
+  await expect(
+    page.getByRole("button", { name: "Subastas", exact: true }),
+  ).toHaveCount(0);
+  state = await (await request.get("/api/city")).json();
+  expect(
+    state.properties.filter((v: { status: string }) => v.status === "auction"),
+  ).toHaveLength(0);
 });

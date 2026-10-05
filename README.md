@@ -208,13 +208,11 @@ En producción crea un endpoint HTTPS para `/api/webhooks/stripe` y suscríbelo 
 
 La implementación usa `allowed_payment_method_types` del SDK Stripe 23 fijado en el lockfile. Prueba una compra y una mejora con claves test, y repite el webhook para confirmar idempotencia antes de habilitar pagos reales.
 
-## Subastas
+## Subastas (desactivadas)
 
-Para pujar hace falta acceder por enlace: evita pujas atribuidas a emails sin verificar en producción. La oferta mínima, el incremento y el final se validan dentro de la transacción. Se guardan importes en euros y se convierten a céntimos al enviar a Stripe.
+Las subastas están retiradas (`AUCTIONS_ENABLED = false` en `lib/features.ts`). Los ocho solares de rascacielos se venden a **precio fijo** (200 € por defecto, editable en City Hall) con el checkout normal y, como el resto de la ciudad, pueden cambiar de manos por **takeover**: quien supera el valor actual pasa a controlar el edificio. City Hall puede seguir reservando un rascacielos para una marca o asignarlo manualmente.
 
-En demo el ganador recibe automáticamente un lease al cerrar la subasta. En live se reserva el espacio al mayor postor y se envía un enlace de pago válido 24 horas. **Un lease real se activa solo después de pagar**. El ganador personaliza el anuncio desde My Buildings. No se cobran automáticamente las pujas ni se retienen tarjetas.
-
-Una subasta sin pujas se cierra. Las adjudicaciones impagadas requieren revisión del administrador; la renovación del proceso o adjudicación al segundo postor no está automatizada. No hay pagos entre usuarios ni Stripe Connect.
+Una migración versionada (`lib/skyscraper-sales.ts`) adapta las ciudades creadas con subastas: cierra las subastas en curso (las pujas nunca se cobran), avisa por email a quienes pujaron y pone a la venta los rascacielos libres. Una adjudicación pendiente de pago se deja terminar. El código de subastas (motor, API, páginas y tests del motor) se conserva inactivo: `/auctions` redirige al mapa, `/api/bids` responde 410 y City Hall no permite abrir subastas. Para recuperarlas basta con volver a activar el interruptor.
 
 ## Emails y mantenimiento
 

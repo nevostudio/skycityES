@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import { PLOT_HEIGHT } from "./presence";
 import { isLaunchNormalPlot } from "./inventory";
+import { AUCTIONS_ENABLED } from "./features";
 import { migrateTakeovers } from "./takeover-policy";
 import {
   DEMO_DESCRIPTION,
@@ -100,11 +101,12 @@ export function makeSeed(demo = true, now = Date.now()): State {
         model: n % 20,
         color: palettes[(i + di) % palettes.length],
         price: sky ? SKYSCRAPER_PRICE : 3,
-        sale: sky?.auction ? "auction" : "rental",
+        sale: sky?.auction && AUCTIONS_ENABLED ? "auction" : "rental",
         featured: [14, 21, 25, 26, 28, 30, 154].includes(n),
         enabled: true,
         inventory: sky ? "skyscraper" : "normal",
-        ...(sky && !sky.auction
+        // With auctions off every skyscraper plot is on sale at its fixed price.
+        ...(sky && !sky.auction && AUCTIONS_ENABLED
           ? { reservedForBrands: true, premiumNote: sky.note }
           : {}),
       });
