@@ -277,6 +277,6 @@ El ranking selecciona el edificio a través del flujo de cámara existente y abr
 
 ## Textos legales y aceptación en el checkout
 
-- Páginas: `/aviso-legal`, `/privacidad`, `/cookies` y `/condiciones`, enlazadas desde la portada (junto a la actividad) y entre sí. Los datos del titular y la versión de las condiciones viven en `lib/legal.ts`.
+- Páginas: `/aviso-legal`, `/privacidad`, `/cookies` y `/condiciones`, enlazadas desde la portada (junto a la actividad) y entre sí. La versión de las condiciones vive en `lib/legal.ts`; los datos del titular (`LEGAL_OWNER`, `LEGAL_TAX_ID`, `LEGAL_ADDRESS`, `LEGAL_EMAIL` y, en sociedades, `LEGAL_REGISTRY`) se leen de variables de entorno para que no queden en el repositorio público.
 - Antes de pagar (compra, mejora o takeover) el checkout exige dos casillas: aceptar condiciones y privacidad, incluido que un takeover no reembolsa al anterior controlador, y pedir la construcción inmediata con renuncia al desistimiento. La API rechaza la compra sin ellas (`consent` en `/api/checkout` y `/api/takeover`) y guarda en la reserva la versión aceptada y la fecha.
 - Los textos son un borrador redactado a partir del funcionamiento real de la app y deben revisarse con un profesional antes del lanzamiento público.

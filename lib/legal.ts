@@ -1,16 +1,21 @@
 /**
- * Legal identity and terms version. The owner fields are placeholders until the holder's
- * details are confirmed; every legal page and the checkout read them from here.
+ * Legal identity and terms version. The holder's personal details are read from environment
+ * variables (Vercel / .env.local) so they never live in the public repository; the bracketed
+ * placeholders show until they are set. Server-side only: read by the legal pages.
  */
+const env = (key: string, fallback: string) =>
+  process.env[key]?.trim() || fallback;
+
 export const LEGAL = {
   /** Bump when the purchase terms change: it is stored with every purchase. */
   version: "2026-10-05",
-  owner: "[NOMBRE Y APELLIDOS O RAZÓN SOCIAL]",
-  taxId: "[NIF / CIF]",
-  address: "[DOMICILIO COMPLETO]",
+  owner: env("LEGAL_OWNER", "[NOMBRE Y APELLIDOS O RAZÓN SOCIAL]"),
+  taxId: env("LEGAL_TAX_ID", "[NIF / CIF]"),
+  address: env("LEGAL_ADDRESS", "[DOMICILIO]"),
   /** Commercial registry details, only for companies. */
-  registry: "",
-  email: "[EMAIL DE CONTACTO]",
+  registry: env("LEGAL_REGISTRY", ""),
+  email: env("LEGAL_EMAIL", "[EMAIL DE CONTACTO]"),
+  tradeName: "SkyCity",
   site: "skycityes.com",
 };
 

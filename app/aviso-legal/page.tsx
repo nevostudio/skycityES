@@ -25,6 +25,10 @@ export default function Page() {
         <li>
           <strong>Email de contacto:</strong> {LEGAL.email}
         </li>
+        <li>
+          <strong>Nombre comercial y dominio:</strong> {LEGAL.tradeName} ·{" "}
+          {LEGAL.site}
+        </li>
         {LEGAL.registry && (
           <li>
             <strong>Datos registrales:</strong> {LEGAL.registry}
