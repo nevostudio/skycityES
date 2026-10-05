@@ -11,8 +11,9 @@ export function isDemo() {
   const mode = process.env.SKYCITY_MODE;
   if (mode === "live" || (mode !== "demo" && configured.length)) {
     if (configured.length !== liveKeys.length)
+      // Names only, never values: tells the deploy log which variable is missing.
       throw new Error(
-        "Live setup incomplete. Configure all Supabase and Stripe variables.",
+        `Live setup incomplete. Missing: ${liveKeys.filter((k) => !configured.includes(k)).join(", ")}.`,
       );
     return false;
   }
