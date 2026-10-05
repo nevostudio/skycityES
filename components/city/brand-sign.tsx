@@ -1,40 +1,53 @@
 "use client";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useSceneMotion } from "./scene-motion";
 import { useCanvasTexture } from "./sign-texture";
 import * as THREE from "three";
-import type { Ad, BuildingTier, ImageSupport, PublicProperty } from "@/types";
+import type { Ad, BuildingTier, PublicProperty } from "@/types";
 import { presenceLevel } from "@/lib/presence";
-import { brandKind, brandTheme, signColors } from "@/lib/brand-theme";
-import { SIGN_YAW, effectiveSupport, signSize } from "@/lib/branding";
 import {
+  brandKind,
+  brandPalette,
+  brandTheme,
+  type BrandPalette,
+} from "@/lib/brand-theme";
+import { SIGN_YAW, signSize } from "@/lib/branding";
+import {
+  drawBrandPanel,
   drawRooftopSign,
   drawScreen,
-  drawSupportImage,
   drawVerticalBanner,
   loadBitmap,
   signFontsReady,
   type Bitmap,
 } from "@/lib/sign-canvas";
-import { architectureOf, massing } from "@/lib/massing";
+import {
+  architectureOf,
+  massing,
+  type Massing,
+  type Volume,
+} from "@/lib/massing";
 
-/** Draw now with fallbacks, then again once the sign fonts and the logo are ready. */
+/** Draw now with fallbacks, then again once the sign fonts, the logo and the image are ready. */
 function paintBrand(
   ad: Ad,
-  draw: (logo: Bitmap | null) => void,
+  draw: (logo: Bitmap | null, image: Bitmap | null) => void,
   update: () => void,
+  withImage = false,
 ) {
-  draw(null);
+  draw(null, null);
   void Promise.all([
     signFontsReady(),
     ad.logo ? loadBitmap(ad.logo) : Promise.resolve(null),
-  ]).then(([, logo]) => {
-    draw(logo);
+    withImage && ad.banner
+      ? loadBitmap(ad.banner, 1024)
+      : Promise.resolve(null),
+  ]).then(([, logo, image]) => {
+    draw(logo, image);
     update();
   });
 }
-
 function Piece({
   position,
   size,
@@ -80,25 +93,50 @@ function Planter({
   );
 }
 const contentKey = (ad: Ad) =>
-  [ad.brand, ad.tagline, ad.logo, ad.primary, ad.secondary, ad.description]
+  [
+    ad.brand,
+    ad.tagline,
+    ad.logo,
+    ad.banner,
+    ad.primary,
+    ad.secondary,
+    ad.description,
+  ]
     .map((v) => v || "")
     .join("|");
+/** Volume dimensions in world units. */
+const dims = (v: Volume, p: PublicProperty) => ({
+  w: v.w * p.width,
+  d: v.d * p.depth,
+  x: v.x * p.width,
+  z: v.z * p.depth,
+  y0: v.y0,
+  y1: v.y1,
+});
+const groundVolume = (m: Massing) =>
+  m.volumes
+    .filter((v) => v.y0 === 0)
+    .reduce((a, b) => (b.w * b.d > a.w * a.d ? b : a));
 
 /**
- * The brand's main support: a physical sign standing on the roof (posts, frame and face).
- * Its size follows the building tier and is capped by the room left by its neighbours.
+ * The brand's main support: a physical sign with posts standing on the crown of the top
+ * volume. Its frame takes the brand colour; size follows the tier and the room left by
+ * neighbours.
  */
 export function RooftopSign({
   p,
   tier,
+  palette,
   maxWidth,
 }: {
   p: PublicProperty & { ad: Ad };
   tier: BuildingTier;
+  palette: BrandPalette;
   maxWidth?: number;
 }) {
   const m = massing(p);
-  const size = signSize(tier, p.width * m.top, maxWidth);
+  const top = dims(m.top, p);
+  const size = signSize(tier, top.w, maxWidth);
   const px = size.pixels;
   const texture = useCanvasTexture(
     `roof:${px}:${size.width.toFixed(2)}:${size.lit}:${contentKey(p.ad)}`,
@@ -111,56 +149,39 @@ export function RooftopSign({
         update,
       ),
   );
-  const { accent } = signColors(p.ad);
-  const roof = p.height + (m.roof === "green" ? 0.2 : 0.16);
+  const roof = m.roofY;
   const bottom = roof + size.lift;
   const y = bottom + size.height / 2;
-  const z = 0;
-  const frame = size.lit ? "#1f2623" : "#3c4541";
+  const posts = "#2c3a35";
   return (
     <group
       name={`rooftop-sign-${p.id}`}
-      position={[0, 0, p.depth * m.top * 0.1]}
+      position={[top.x, 0, top.z + top.d * 0.1]}
       rotation={[0, SIGN_YAW, 0]}
     >
       {[-0.36, 0.36].map((k) => (
         <mesh
           key={k}
-          position={[k * size.width, (roof + bottom) / 2 + 0.05, z - 0.02]}
+          position={[k * size.width, (roof + bottom) / 2 + 0.05, -0.02]}
           castShadow
         >
           <boxGeometry args={[0.08, size.lift + 0.1, 0.08]} />
-          <meshStandardMaterial color={frame} roughness={0.6} />
+          <meshStandardMaterial color={posts} roughness={0.6} />
         </mesh>
       ))}
-      <mesh position={[0, y, z]} castShadow>
-        <boxGeometry args={[size.width + 0.1, size.height + 0.1, 0.1]} />
-        <meshStandardMaterial color={frame} roughness={0.55} />
+      <mesh position={[0, y, 0]} castShadow>
+        <boxGeometry args={[size.width + 0.14, size.height + 0.14, 0.1]} />
+        <meshStandardMaterial color={palette.primary} roughness={0.5} />
       </mesh>
       {texture && (
-        <mesh position={[0, y, z + 0.052]}>
+        <mesh position={[0, y, 0.052]}>
           <planeGeometry args={[size.width, size.height]} />
           <meshBasicMaterial map={texture} toneMapped={false} />
         </mesh>
       )}
       {size.lit &&
-        [1, -1].map((side) => (
-          <mesh
-            key={side}
-            position={[0, y + side * (size.height / 2 + 0.06), z + 0.03]}
-          >
-            <boxGeometry args={[size.width + 0.12, 0.05, 0.14]} />
-            <meshStandardMaterial
-              color={accent}
-              emissive={accent}
-              emissiveIntensity={1.1}
-              toneMapped={false}
-            />
-          </mesh>
-        ))}
-      {size.lit &&
         [-0.3, 0, 0.3].map((k) => (
-          <mesh key={k} position={[k * size.width, bottom - 0.02, z + 0.22]}>
+          <mesh key={k} position={[k * size.width, bottom - 0.02, 0.22]}>
             <boxGeometry args={[0.16, 0.06, 0.12]} />
             <meshBasicMaterial color="#fff3cf" toneMapped={false} />
           </mesh>
@@ -169,119 +190,16 @@ export function RooftopSign({
   );
 }
 
-type Spot = {
-  position: [number, number, number];
-  size: [number, number];
-  side: boolean;
-  glow: boolean;
-};
-/** Advertising image placements, prepared for every support; the first three are prioritised. */
-function placement(
-  support: ImageSupport,
-  w: number,
-  h: number,
-  d: number,
-): Spot | null {
-  if (support === "SIDE_BILLBOARD") {
-    const sw = Math.min(d * 0.85, 2.6),
-      sh = sw * 0.6;
-    if (h < sh + 1.2) return null;
-    const y = Math.max(h - sh / 2 - 0.35, sh / 2 + 0.6);
-    return {
-      position: [w / 2 + 0.17, y, 0],
-      size: [sw, sh],
-      side: true,
-      glow: false,
-    };
-  }
-  if (support === "PARTIAL_FACADE") {
-    const pw = w * 0.78,
-      ph = Math.min(pw * 0.62, h - 2.6);
-    if (ph < 0.8) return null;
-    return {
-      position: [0, h - 0.35 - ph / 2, d / 2 + 0.07],
-      size: [pw, ph],
-      side: false,
-      glow: false,
-    };
-  }
-  if (support === "FULL_FACADE") {
-    const ph = h - 2.5;
-    if (ph < 1.5) return null;
-    return {
-      position: [0, 2.25 + ph / 2, d / 2 + 0.07],
-      size: [w * 0.94, ph],
-      side: false,
-      glow: false,
-    };
-  }
-  const sh = Math.min(h * 0.72, 9);
-  if (sh < 3) return null;
-  return {
-    position: [w / 2 + 0.15, h - sh / 2 - 0.4, d * 0.18],
-    size: [0.95, sh],
-    side: true,
-    glow: true,
-  };
-}
-export function ImageSupportView({
+/** Casco Antiguo: the main sign hangs on the facade, above the ground floor. */
+function FacadeSign({
   p,
-  support,
+  palette,
 }: {
   p: PublicProperty & { ad: Ad };
-  support: ImageSupport;
+  palette: BrandPalette;
 }) {
-  const spot = placement(support, p.width, p.height, p.depth);
-  const [sw, sh] = spot?.size ?? [1, 1];
-  const px = Math.round(Math.min(1024, 380 * Math.max(sw, sh)));
-  const texture = useCanvasTexture(
-    spot
-      ? `support:${support}:${sw.toFixed(2)}x${sh.toFixed(2)}:${p.ad.banner}:${contentKey(p.ad)}`
-      : null,
-    sw >= sh ? px : (px * sw) / sh,
-    sw >= sh ? (px * sh) / sw : px,
-    (canvas, update) => {
-      drawSupportImage(canvas, p.ad, null, null);
-      void Promise.all([
-        p.ad.banner ? loadBitmap(p.ad.banner, 1024) : null,
-        p.ad.logo ? loadBitmap(p.ad.logo) : null,
-      ]).then(([banner, logo]) => {
-        if (!banner && !logo) return;
-        drawSupportImage(canvas, p.ad, banner, logo);
-        update();
-      });
-    },
-  );
-  if (!spot) return null;
-  const { accent } = signColors(p.ad);
-  return (
-    <group
-      name={`support-${support}-${p.id}`}
-      position={spot.position}
-      rotation={[0, spot.side ? Math.PI / 2 : 0, 0]}
-    >
-      <mesh position={[0, 0, -0.04]} castShadow>
-        <boxGeometry args={[sw + 0.12, sh + 0.12, 0.06]} />
-        <meshStandardMaterial
-          color={spot.glow ? accent : "#3c4541"}
-          emissive={spot.glow ? accent : "#000000"}
-          emissiveIntensity={spot.glow ? 0.6 : 0}
-          roughness={0.6}
-        />
-      </mesh>
-      {texture && (
-        <mesh>
-          <planeGeometry args={[sw, sh]} />
-          <meshBasicMaterial map={texture} toneMapped={false} />
-        </mesh>
-      )}
-    </group>
-  );
-}
-
-/** Casco Antiguo: the main sign hangs on the facade, above the ground floor (PDF page 3). */
-function FacadeSign({ p }: { p: PublicProperty & { ad: Ad } }) {
-  const width = Math.min(p.width * 0.86, 3),
+  const g = dims(groundVolume(massing(p)), p);
+  const width = Math.min(g.w * 0.86, 3),
     height = width * 0.34;
   const texture = useCanvasTexture(
     `facade:${width.toFixed(2)}:${contentKey(p.ad)}`,
@@ -293,11 +211,11 @@ function FacadeSign({ p }: { p: PublicProperty & { ad: Ad } }) {
   return (
     <group
       name={`facade-sign-${p.id}`}
-      position={[0, 2.45, p.depth / 2 + 0.09]}
+      position={[g.x, 2.45, g.z + g.d / 2 + 0.09]}
     >
       <mesh castShadow>
-        <boxGeometry args={[width + 0.1, height + 0.1, 0.08]} />
-        <meshStandardMaterial color="#3c4541" roughness={0.6} />
+        <boxGeometry args={[width + 0.14, height + 0.14, 0.08]} />
+        <meshStandardMaterial color={palette.primary} roughness={0.6} />
       </mesh>
       {texture && (
         <mesh position={[0, 0, 0.045]}>
@@ -308,16 +226,99 @@ function FacadeSign({ p }: { p: PublicProperty & { ad: Ad } }) {
     </group>
   );
 }
-/** Secondary element for PREMIUM and LANDMARK: a brand-coloured vertical banner. */
-function VerticalBanner({ p }: { p: PublicProperty & { ad: Ad } }) {
-  const m = massing(p);
-  const tower = p.height - m.podium;
-  const height = Math.min(Math.max(tower * 0.78, 2.2), 8),
-    width = Math.min(0.75, p.width * 0.24);
+
+/**
+ * Dominant brand panel on a facade: the advertising image, or the logo large on the brand
+ * colour, framed in the contrasting neutral. Front panels face the street; side panels
+ * cover the tall side of PREMIUM and LANDMARK towers.
+ */
+function BrandPanel({
+  p,
+  palette,
+  v,
+  side,
+  share,
+  screen = false,
+  image = false,
+}: {
+  p: PublicProperty & { ad: Ad };
+  palette: BrandPalette;
+  v: Volume;
+  side: boolean;
+  /** Share of the facade width it covers. */
+  share: number;
+  screen?: boolean;
+  image?: boolean;
+}) {
+  const b = dims(v, p);
+  const faceW = side ? b.d : b.w;
+  const floorFrom = Math.max(b.y0, 2.15);
+  const span = b.y1 - floorFrom - 0.35;
+  const width = faceW * share;
+  const height = Math.min(span, width * (side ? 1.5 : 0.78), side ? 6 : 3.2);
+  const ok = span >= 0.8 && height >= 0.8;
+  const pxW = width >= height ? 768 : Math.round((768 * width) / height);
+  const pxH = width >= height ? Math.round((768 * height) / width) : 768;
   const texture = useCanvasTexture(
-    `banner:${height.toFixed(1)}:${contentKey(p.ad)}`,
-    160,
-    (160 * height) / width,
+    ok
+      ? `panel:${screen}:${image}:${width.toFixed(2)}x${height.toFixed(2)}:${palette.primary}:${contentKey(p.ad)}`
+      : null,
+    pxW,
+    pxH,
+    (canvas, update) =>
+      paintBrand(
+        p.ad,
+        (logo, img) =>
+          screen && !img
+            ? drawScreen(canvas, p.ad, logo)
+            : drawBrandPanel(canvas, p.ad, palette, img, logo),
+        update,
+        image,
+      ),
+  );
+  if (!ok) return null;
+  const y = b.y1 - 0.35 - height / 2;
+  return (
+    <group
+      name={`brand-panel-${side ? "side" : "front"}-${p.id}`}
+      position={
+        side ? [b.x + b.w / 2 + 0.07, y, b.z] : [b.x, y, b.z + b.d / 2 + 0.07]
+      }
+      rotation={[0, side ? Math.PI / 2 : 0, 0]}
+    >
+      <mesh position={[0, 0, -0.04]} castShadow>
+        <boxGeometry args={[width + 0.18, height + 0.18, 0.08]} />
+        <meshStandardMaterial
+          color={screen ? "#20292b" : palette.secondary}
+          roughness={0.55}
+        />
+      </mesh>
+      {texture && (
+        <mesh position={[0, 0, 0.005]}>
+          <planeGeometry args={[width, height]} />
+          <meshBasicMaterial map={texture} toneMapped={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/** Vertical banner (lona) down the tower front, in the brand colour with its emblem. */
+function VerticalBanner({
+  p,
+  palette,
+}: {
+  p: PublicProperty & { ad: Ad };
+  palette: BrandPalette;
+}) {
+  const t = dims(massing(p).top, p);
+  const tower = t.y1 - Math.max(t.y0, 2.2);
+  const height = Math.min(Math.max(tower * 0.8, 2.2), 8),
+    width = Math.min(0.85, t.w * 0.26);
+  const texture = useCanvasTexture(
+    `banner:${height.toFixed(1)}:${width.toFixed(2)}:${contentKey(p.ad)}`,
+    180,
+    (180 * height) / width,
     (canvas, update) =>
       paintBrand(
         p.ad,
@@ -325,13 +326,14 @@ function VerticalBanner({ p }: { p: PublicProperty & { ad: Ad } }) {
         update,
       ),
   );
-  const tw = p.width * m.top,
-    td = p.depth * m.top;
-  const y = tower > 1 ? p.height - 0.35 - height / 2 : p.height * 0.6;
   return (
     <group
       name={`vertical-banner-${p.id}`}
-      position={[tw / 2 - width / 2 - 0.12, y, td / 2 + 0.05]}
+      position={[
+        t.x - t.w / 2 + width / 2 + 0.14,
+        t.y1 - 0.4 - height / 2,
+        t.z + t.d / 2 + 0.06,
+      ]}
     >
       {texture && (
         <mesh>
@@ -339,59 +341,31 @@ function VerticalBanner({ p }: { p: PublicProperty & { ad: Ad } }) {
           <meshBasicMaterial map={texture} toneMapped={false} />
         </mesh>
       )}
-      <mesh position={[0, height / 2 + 0.03, -0.02]}>
-        <boxGeometry args={[width + 0.1, 0.06, 0.06]} />
-        <meshStandardMaterial color="#3c4541" />
+      <mesh position={[0, height / 2 + 0.04, -0.02]}>
+        <boxGeometry args={[width + 0.12, 0.08, 0.08]} />
+        <meshStandardMaterial color={palette.secondary} />
       </mesh>
     </group>
   );
 }
-/** Secondary element for Distrito de Ocio: a lit facade screen. */
-function FacadeScreen({ p }: { p: PublicProperty & { ad: Ad } }) {
-  const width = p.width * 0.62,
-    height = Math.min(1.2, Math.max(0.8, (p.height - 2.4) * 0.5));
-  const texture = useCanvasTexture(
-    `screen:${width.toFixed(2)}:${contentKey(p.ad)}`,
-    512,
-    (512 * height) / width,
-    (canvas, update) =>
-      paintBrand(p.ad, (logo) => drawScreen(canvas, p.ad, logo), update),
-  );
-  if (p.height < 3) return null;
-  return (
-    <group
-      name={`screen-${p.id}`}
-      position={[0, p.height - 0.45 - height / 2, p.depth / 2 + 0.06]}
-    >
-      <mesh position={[0, 0, -0.02]}>
-        <boxGeometry args={[width + 0.12, height + 0.12, 0.05]} />
-        <meshStandardMaterial color="#20292b" />
-      </mesh>
-      {texture && (
-        <mesh position={[0, 0, 0.01]}>
-          <planeGeometry args={[width, height]} />
-          <meshBasicMaterial map={texture} toneMapped={false} />
-        </mesh>
-      )}
-    </group>
-  );
-}
-/** Secondary element for PLUS and PRO: an awning over the shopfront (striped in Casco Antiguo). */
+
+/** PLUS front detail: awning over the shopfront (striped in Casco Antiguo). */
 function Awning({
   p,
-  color,
+  palette,
   striped,
 }: {
   p: PublicProperty;
-  color: string;
+  palette: BrandPalette;
   striped: boolean;
 }) {
-  const width = p.width * 0.88;
+  const g = dims(groundVolume(massing(p)), p);
+  const width = g.w * 0.88;
   const stripes = striped ? 7 : 1;
   return (
     <group
       name={`awning-${p.id}`}
-      position={[0, 1.92, p.depth / 2 + 0.38]}
+      position={[g.x, 1.92, g.z + g.d / 2 + 0.4]}
       rotation={[0.38, 0, 0]}
     >
       {Array.from({ length: stripes }, (_, i) => (
@@ -400,21 +374,27 @@ function Awning({
           position={[-width / 2 + (width / stripes) * (i + 0.5), 0, 0]}
           castShadow
         >
-          <boxGeometry args={[width / stripes, 0.07, 0.86]} />
+          <boxGeometry args={[width / stripes, 0.07, 0.9]} />
           <meshStandardMaterial
-            color={striped && i % 2 ? "#fbf8f1" : color}
+            color={striped && i % 2 ? palette.secondary : palette.primary}
             roughness={0.8}
           />
         </mesh>
       ))}
+      <mesh position={[0, -0.05, 0.46]}>
+        <boxGeometry args={[width + 0.02, 0.16, 0.05]} />
+        <meshStandardMaterial color={palette.secondary} />
+      </mesh>
     </group>
   );
 }
 
 /**
- * Branding of a building (PDF page 2): one main element (rooftop sign with posts, or a
- * facade sign on pitched roofs) and one optional secondary element chosen by tier and
- * district: advertising image, vertical banner, screen or awning. Never the name twice.
+ * Brand identity of a building. Every tier adds supports on top of the coloured
+ * architecture (see BuildingForm):
+ * STARTER: sign · PLUS: sign + front detail · PRO: sign + front panel ·
+ * PREMIUM: sign + large front or side panel · LANDMARK: lit sign, vertical banner and panels.
+ * Billboard and facade patterns get their dominant panel from PLUS up.
  */
 export function BrandSign({
   p,
@@ -425,35 +405,45 @@ export function BrandSign({
 }) {
   const theme = brandTheme(p.ad),
     kind = brandKind(p.ad);
+  const palette = useMemo(() => brandPalette(p.ad), [p.ad]);
   const motion = useSceneMotion(),
     time = useRef(0),
     neon = useRef<THREE.MeshStandardMaterial>(null);
   const tier = p.building?.tier ?? "STARTER";
-  const h = p.height,
-    w = p.width,
-    d = p.depth;
+  const level = presenceLevel(tier);
+  const m = massing(p);
+  const arch = architectureOf(p.districtId);
+  const curated = kind !== "custom";
+  const t = dims(m.top, p);
+  const g = dims(groundVolume(m), p);
+  const h = p.height;
   const cafe = kind === "cafe",
     garden = kind === "garden",
     club = kind === "nightlife";
-  const level = presenceLevel(tier);
-  const arch = architectureOf(p.districtId);
-  const m = massing(p);
-  // One secondary element: the owner's advertising image wins; curated demo brands keep
-  // their own storefronts; otherwise tier and district choose.
-  const support = p.ad.banner ? effectiveSupport(p.ad, tier) : null;
-  const secondary = support
-    ? "image"
-    : kind !== "custom"
-      ? "curated"
-      : level >= 3
-        ? "banner"
-        : arch === "leisure" && level >= 1
-          ? "screen"
-          : arch === "tech"
-            ? "stripe"
-            : level >= 1
-              ? "awning"
-              : null;
+  // The tallest volume that rises above the ground floor carries the panels.
+  const panelVolume =
+    m.volumes
+      .filter((v) => v.y1 - Math.max(v.y0, 2.15) >= 1)
+      .sort((a, b) => b.y1 - b.y0 - (a.y1 - a.y0))[0] ?? m.top;
+  const banner = !!p.ad.banner;
+  const wantsSide = banner && p.ad.support === "SIDE_BILLBOARD";
+  const dominant = m.pattern === "facade" || m.pattern === "billboard";
+  const front =
+    level >= 2 ||
+    (level === 1 && dominant) ||
+    (banner && level >= 1 && !wantsSide);
+  const side =
+    level >= 4 ||
+    (level === 3 && m.variant % 2 === 1) ||
+    (wantsSide && level >= 1);
+  const frontShare =
+    m.pattern === "billboard"
+      ? 0.88
+      : m.pattern === "facade"
+        ? 0.8
+        : level >= 3
+          ? 0.72
+          : 0.6;
   useFrame((_, delta) => {
     if (!motion || !neon.current) return;
     time.current += Math.min(delta, 0.05);
@@ -462,39 +452,66 @@ export function BrandSign({
   return (
     <group name={"branding-" + p.id}>
       {m.roof === "gable" ? (
-        <FacadeSign p={p} />
+        <FacadeSign p={p} palette={palette} />
       ) : (
-        <RooftopSign p={p} tier={tier} maxWidth={maxSignWidth} />
+        <RooftopSign
+          p={p}
+          tier={tier}
+          palette={palette}
+          maxWidth={maxSignWidth}
+        />
       )}
-      {support && <ImageSupportView p={p} support={support} />}
-      {secondary === "banner" && <VerticalBanner p={p} />}
-      {secondary === "screen" && <FacadeScreen p={p} />}
-      {secondary === "awning" && (
-        <Awning p={p} color={theme.accent} striped={arch === "historic"} />
+      {front && !(curated && level < 3) && (
+        <BrandPanel
+          p={p}
+          palette={palette}
+          v={panelVolume}
+          side={false}
+          share={frontShare}
+          screen={arch === "leisure"}
+          image={banner && !wantsSide}
+        />
+      )}
+      {side && (
+        <BrandPanel
+          p={p}
+          palette={palette}
+          v={panelVolume}
+          side
+          share={level >= 4 ? 0.7 : 0.62}
+          image={wantsSide}
+        />
+      )}
+      {level >= 4 && <VerticalBanner p={p} palette={palette} />}
+      {level === 1 && !dominant && !curated && (
+        <Awning p={p} palette={palette} striped={arch === "historic"} />
       )}
       {cafe && (
         <>
           <Piece
-            position={[0, 0.85, d / 2 + 0.12]}
-            size={[w * 0.86, 1.32, 0.13]}
+            position={[g.x, 0.85, g.z + g.d / 2 + 0.12]}
+            size={[g.w * 0.86, 1.32, 0.13]}
             color="#e8b571"
             glow={0.45}
           />
           {[-1, 0, 1].map((x) => (
             <Piece
               key={x}
-              position={[x * w * 0.28, 0.85, d / 2 + 0.22]}
+              position={[g.x + x * g.w * 0.28, 0.85, g.z + g.d / 2 + 0.22]}
               size={[0.08, 1.45, 0.08]}
               color="#694d36"
             />
           ))}
           <Piece
-            position={[0, 1.62, d / 2 + 0.42]}
-            size={[w * 1.12, 0.15, 0.8]}
+            position={[g.x, 1.62, g.z + g.d / 2 + 0.42]}
+            size={[g.w * 1.12, 0.15, 0.8]}
             color="#c59a6b"
           />
-          {[-1, 1].map((side) => (
-            <group key={side} position={[side * w * 0.32, 0, d / 2 + 0.87]}>
+          {[-1, 1].map((s) => (
+            <group
+              key={s}
+              position={[g.x + s * g.w * 0.32, 0, g.z + g.d / 2 + 0.87]}
+            >
               <mesh position={[0, 0.48, 0]} castShadow>
                 <cylinderGeometry args={[0.26, 0.26, 0.06, 12]} />
                 <meshStandardMaterial color="#b78b59" />
@@ -511,54 +528,47 @@ export function BrandSign({
               />
             </group>
           ))}
-          <Piece
-            position={[0, 1.78, d / 2 + 0.32]}
-            size={[w * 0.9, 0.055, 0.08]}
-            color="#ffcf89"
-            glow={0.6}
-          />
         </>
       )}
       {garden && (
         <>
           <Piece
-            position={[0, h + 0.38, -d * 0.12]}
-            size={[w * 0.85, 0.22, d * 0.56]}
+            position={[t.x, h + 0.38, t.z - t.d * 0.12]}
+            size={[t.w * 0.85, 0.22, t.d * 0.56]}
             color="#7a9755"
           />
           {[-1, 1].map((x) => (
-            <Planter key={x} position={[x * w * 0.32, h + 0.45, -d * 0.28]} />
+            <Planter
+              key={x}
+              position={[t.x + x * t.w * 0.32, h + 0.45, t.z - t.d * 0.28]}
+            />
           ))}
           <Piece
-            position={[0, 1.5, d / 2 + 0.43]}
-            size={[w * 1.15, 0.2, 0.9]}
+            position={[g.x, 1.5, g.z + g.d / 2 + 0.43]}
+            size={[g.w * 1.15, 0.2, 0.9]}
             color="#4b7546"
           />
           {[-2, -1, 0, 1, 2].map((i) => (
             <Piece
               key={i}
-              position={[i * w * 0.2, 1.61, d / 2 + 0.45]}
-              size={[w * 0.07, 0.025, 0.85]}
+              position={[g.x + i * g.w * 0.2, 1.61, g.z + g.d / 2 + 0.45]}
+              size={[g.w * 0.07, 0.025, 0.85]}
               color="#d4dfb6"
             />
           ))}
-          <Planter position={[-w * 0.36, 0.05, d / 2 + 0.8]} size={0.65} />
-          <Planter position={[w * 0.36, 0.05, d / 2 + 0.8]} size={0.65} />
-          <Piece
-            position={[0, 0.4, d / 2 + 0.64]}
-            size={[w * 0.42, 0.45, 0.45]}
-            color="#b99565"
+          <Planter
+            position={[g.x - g.w * 0.36, 0.05, g.z + g.d / 2 + 0.8]}
+            size={0.65}
           />
-          <Piece
-            position={[0, 0.65, d / 2 + 0.64]}
-            size={[w * 0.36, 0.12, 0.37]}
-            color="#9eb64f"
+          <Planter
+            position={[g.x + g.w * 0.36, 0.05, g.z + g.d / 2 + 0.8]}
+            size={0.65}
           />
         </>
       )}
       {club && (
         <>
-          <mesh position={[w / 2 + 0.28, h * 0.54, -d * 0.38]}>
+          <mesh position={[t.x + t.w / 2 + 0.06, h * 0.54, t.z - t.d * 0.38]}>
             <boxGeometry args={[0.09, h * 0.84, 0.09]} />
             <meshStandardMaterial
               ref={neon}
@@ -569,53 +579,37 @@ export function BrandSign({
             />
           </mesh>
           <Piece
-            position={[0, 1.8, d / 2 + 0.42]}
-            size={[w * 1.15, 0.1, 0.85]}
+            position={[g.x, 1.8, g.z + g.d / 2 + 0.42]}
+            size={[g.w * 1.15, 0.1, 0.85]}
             color="#ae66df"
             glow={0.7}
           />
           <Piece
-            position={[0, 0.75, d / 2 + 0.12]}
-            size={[w * 0.55, 1.5, 0.09]}
+            position={[g.x, 0.75, g.z + g.d / 2 + 0.12]}
+            size={[g.w * 0.55, 1.5, 0.09]}
             color="#653869"
             glow={0.2}
           />
-          {[-1, 1].map((side) => (
-            <Piece
-              key={side}
-              position={[side * w * 0.3, 1, d / 2 + 0.25]}
-              size={[0.055, 1.8, 0.06]}
-              color="#f08fe0"
-              glow={0.7}
-            />
-          ))}
         </>
       )}
       {kind === "lab" && (
-        <>
-          <Piece
-            position={[-w * 0.45, h * 0.5, d / 2 + 0.13]}
-            size={[0.2, h, 0.2]}
-            color={theme.accent}
-          />
-          <Piece
-            position={[0, 1.65, d / 2 + 0.38]}
-            size={[w * 0.88, 0.14, 0.7]}
-            color={theme.accent}
-          />
-        </>
+        <Piece
+          position={[g.x, 1.65, g.z + g.d / 2 + 0.38]}
+          size={[g.w * 0.88, 0.14, 0.7]}
+          color={theme.accent}
+        />
       )}
       {kind === "studio" && (
         <Piece
-          position={[0, 1.8, d / 2 + 0.42]}
-          size={[w * 1.1, 0.13, 0.8]}
+          position={[g.x, 1.8, g.z + g.d / 2 + 0.42]}
+          size={[g.w * 1.1, 0.13, 0.8]}
           color="#cfb89c"
         />
       )}
       {kind === "digital" && (
         <Piece
-          position={[0, 1.7, d / 2 + 0.32]}
-          size={[w * 1.08, 0.12, 0.65]}
+          position={[g.x, 1.7, g.z + g.d / 2 + 0.32]}
+          size={[g.w * 1.08, 0.12, 0.65]}
           color={theme.accent}
           glow={0.12}
         />

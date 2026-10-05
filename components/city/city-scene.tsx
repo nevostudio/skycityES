@@ -10,6 +10,7 @@ import { euro, siteNote } from "@/lib/client";
 import { FLOOR_HEIGHT, GROUND_FLOOR_HEIGHT } from "@/lib/presence";
 import { signLimits } from "@/lib/branding";
 import { massing } from "@/lib/massing";
+import { brandPalette } from "@/lib/brand-theme";
 import { AVENUE, SHOWCASE, showcaseZoom } from "@/lib/showcase";
 
 import {
@@ -82,32 +83,43 @@ function Details({
           c: string;
           r?: number;
         }[] = [];
-        // One row per upper floor; the taller ground floor keeps its shopfront.
-        // Above a set-back base the windows move onto the narrower tower faces.
+        // One row per floor on every volume of the silhouette (set-backs, side blocks),
+        // with glass that reads on the brand colour.
         const m = massing(p);
-        for (let f = 1; f < p.building.floors; f++) {
-          const y = GROUND_FLOOR_HEIGHT + (f - 1) * FLOOR_HEIGHT + 0.5;
-          const k = y > m.podium ? m.top : 1;
-          const c = y > m.podium && m.glassTop ? "#7f99a1" : windowColor(p);
-          for (let j = -1; j <= 1; j++) {
-            a.push({
-              p: [
-                p.x + j * 0.72 * k,
-                y + 0.32,
-                p.z + (p.depth * k) / 2 + 0.025,
-              ],
-              s: [0.42 * k, 0.55, 0.045],
-              c,
-            });
-            a.push({
-              p: [
-                p.x + (p.width * k) / 2 + 0.025,
-                y + 0.32,
-                p.z + j * 0.82 * k,
-              ],
-              s: [0.045, 0.55, 0.46 * k],
-              c,
-            });
+        const brand = p.ad ? brandPalette(p.ad) : null;
+        for (const v of m.volumes) {
+          const vw = v.w * p.width,
+            vd = v.d * p.depth,
+            cx = p.x + v.x * p.width,
+            cz = p.z + v.z * p.depth;
+          const branded =
+            brand &&
+            (m.pattern === "rooftop" ||
+              m.pattern === "wrapped" ||
+              m.pattern === "billboard") &&
+            v.role !== "base";
+          const c = branded
+            ? brand.window
+            : v.role !== "base" && m.glassTop
+              ? "#7f99a1"
+              : windowColor(p);
+          const cols = vw > 2.3 ? 3 : 2;
+          for (let f = 1; f < p.building.floors; f++) {
+            const y = GROUND_FLOOR_HEIGHT + (f - 1) * FLOOR_HEIGHT + 0.5;
+            if (y < v.y0 + 0.2 || y + 0.3 > v.y1) continue;
+            for (let j = 0; j < cols; j++) {
+              const u = (j - (cols - 1) / 2) / cols;
+              a.push({
+                p: [cx + u * vw * 0.82, y + 0.32, cz + vd / 2 + 0.025],
+                s: [(vw / cols) * 0.5, 0.58, 0.045],
+                c,
+              });
+              a.push({
+                p: [cx + vw / 2 + 0.025, y + 0.32, cz + u * vd * 0.82],
+                s: [0.045, 0.58, (vd / cols) * 0.5],
+                c,
+              });
+            }
           }
         }
         return a.map((item) => {
@@ -613,11 +625,11 @@ export default function CityScene({
       <color attach="background" args={["#efe9dc"]} />
       {/* A soft haze on far districts gives depth to the curated first view. */}
       <fog attach="fog" args={["#efe9dc", 225, 340]} />
-      <ambientLight intensity={1.15} />
-      <hemisphereLight args={["#fbf8f1", "#cbbf9f", 1]} />
+      <ambientLight intensity={0.95} />
+      <hemisphereLight args={["#fbf8f1", "#c4b894", 0.9]} />
       <directionalLight
         position={[-45, 90, 30]}
-        intensity={3}
+        intensity={3.4}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-95}

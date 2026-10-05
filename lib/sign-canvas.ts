@@ -339,3 +339,56 @@ export function drawScreen(
   if (logo) contain(c, logo, (W - W * 0.6) / 2, H * 0.1, W * 0.6, box);
   else emblem(c, ad, (W - box) / 2, H * 0.1, box);
 }
+
+/**
+ * Dominant brand panel (front or side): the advertising image when there is one, otherwise
+ * the logo (or initial) large on the brand colour, readable at normal zoom.
+ */
+export function drawBrandPanel(
+  canvas: HTMLCanvasElement,
+  ad: Ad,
+  colors: { primary: string; secondary: string },
+  image: Bitmap | null,
+  logo: Bitmap | null,
+) {
+  const c = canvas.getContext("2d")!;
+  const W = canvas.width,
+    H = canvas.height;
+  c.clearRect(0, 0, W, H);
+  if (image) {
+    cover(c, image, 0, 0, W, H);
+    return;
+  }
+  c.fillStyle = colors.primary;
+  c.fillRect(0, 0, W, H);
+  const tile = Math.min(W, H) * 0.7;
+  const x = (W - tile) / 2,
+    y = (H - tile) / 2;
+  c.fillStyle = "#fbf8f1";
+  roundRect(c, x, y, tile, tile, tile * 0.2);
+  c.fill();
+  if (logo)
+    contain(
+      c,
+      logo,
+      x + tile * 0.12,
+      y + tile * 0.12,
+      tile * 0.76,
+      tile * 0.76,
+    );
+  else {
+    c.fillStyle = colors.primary;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = `800 ${tile * 0.6}px ${family("display")}`;
+    c.fillText(ad.brand.trim().charAt(0).toUpperCase(), W / 2, y + tile * 0.54);
+  }
+  c.strokeStyle = colors.secondary;
+  c.lineWidth = Math.min(W, H) * 0.04;
+  c.strokeRect(
+    c.lineWidth / 2,
+    c.lineWidth / 2,
+    W - c.lineWidth,
+    H - c.lineWidth,
+  );
+}

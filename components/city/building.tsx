@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { BrandSign } from "./brand-sign";
-import { brandKind, brandTheme, tint } from "@/lib/brand-theme";
+import { brandPalette } from "@/lib/brand-theme";
 import { districtStyle, districtWall } from "./district-style";
 import { BuildingForm } from "./architecture";
 import { architectureOf } from "@/lib/massing";
@@ -300,20 +300,10 @@ export const Building = memo(function Building({
             : p.type === "house" && level <= 1
               ? 1.3
               : 0.9);
-  // PDF page 3: the district sets the material; the brand shows through its sign and one
-  // secondary element. Only leisure facades and curated demo brands take the brand colour.
-  const arch = architectureOf(p.districtId);
-  const curated = !!p.ad && brandKind(p.ad) !== "custom";
-  const color = muted
-    ? "#d6d8cf"
-    : civic
-      ? p.color
-      : curated
-        ? brandTheme(p.ad!).background
-        : arch === "leisure" && p.ad
-          ? tint(p.ad.primary, 0.32)
-          : districtWall(p);
-  const accent = p.ad?.primary ?? district.trim;
+  // The brand takes over the architecture (colour, silhouette, facade); the district only
+  // sets the neutral material. City-owned buildings keep their civic colour.
+  const color = muted ? "#d6d8cf" : civic ? p.color : districtWall(p);
+  const brand = useMemo(() => (p.ad ? brandPalette(p.ad) : null), [p.ad]);
   function enter(e: ThreeEvent<PointerEvent>) {
     e.stopPropagation();
     setHover(true);
@@ -369,7 +359,7 @@ export const Building = memo(function Building({
         </group>
       )}
       <group ref={growth} scale={[1, construction ? 0.002 : 1, 1]}>
-        <BuildingForm p={p} wall={color} accent={accent} muted={muted} />
+        <BuildingForm p={p} wall={color} brand={brand} muted={muted} />
         {(selected || hover) && (
           <lineSegments
             geometry={outline}
