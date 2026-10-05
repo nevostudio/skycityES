@@ -11,6 +11,8 @@ import { FLOOR_HEIGHT, GROUND_FLOOR_HEIGHT } from "@/lib/presence";
 import { signLimits } from "@/lib/branding";
 import { massing } from "@/lib/massing";
 import { brandPalette } from "@/lib/brand-theme";
+import { logoInfo } from "@/lib/logo-info";
+import { useLogosVersion } from "./use-brand-palette";
 import { AVENUE, SHOWCASE, showcaseZoom } from "@/lib/showcase";
 
 import {
@@ -73,6 +75,8 @@ function Details({
   districts: District[];
   hidden: Set<string>;
 }) {
+  // Logos refine some brand colours once analysed: recompute the glass then.
+  const logos = useLogosVersion();
   const windows = useMemo(
     () =>
       properties.flatMap((p) => {
@@ -86,7 +90,9 @@ function Details({
         // One row per floor on every volume of the silhouette (set-backs, side blocks),
         // with glass that reads on the brand colour.
         const m = massing(p);
-        const brand = p.ad ? brandPalette(p.ad) : null;
+        const brand = p.ad
+          ? brandPalette(p.ad, logoInfo(p.ad.logo || undefined))
+          : null;
         for (const v of m.volumes) {
           const vw = v.w * p.width,
             vd = v.d * p.depth,
@@ -130,7 +136,7 @@ function Details({
           };
         });
       }),
-    [properties, hidden],
+    [properties, hidden, logos],
   );
   const trees = useMemo(() => {
     const a: {

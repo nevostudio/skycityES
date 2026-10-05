@@ -137,6 +137,51 @@ function cover(
     h,
   );
 }
+/** Average lightness (0–1) of a logo's opaque pixels: decides the plate it needs. */
+const tones = new WeakMap<Bitmap, number>();
+export function logoTone(logo: Bitmap) {
+  let tone = tones.get(logo);
+  if (tone !== undefined) return tone;
+  tone = 0.5;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 32;
+    const c = canvas.getContext("2d", { willReadFrequently: true })!;
+    c.drawImage(logo, 0, 0, 32, 32);
+    const d = c.getImageData(0, 0, 32, 32).data;
+    let sum = 0,
+      n = 0;
+    for (let i = 0; i < d.length; i += 4)
+      if (d[i + 3] > 160) {
+        sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+        n++;
+      }
+    if (n) tone = sum / n;
+  } catch {
+    // Unreadable (cross-origin) logo: assume a mid tone.
+  }
+  tones.set(logo, tone);
+  return tone;
+}
+/** Plate colour a logo needs on a background, or null when it already stands out. */
+function plateFor(logo: Bitmap, background: string) {
+  const tone = logoTone(logo),
+    bg = luminance(normalizeColor(background));
+  if (tone > 0.78 && bg > 0.6) return "#1c2826";
+  if (tone < 0.25 && bg < 0.35) return "#fbf8f0";
+  return null;
+}
+const normalizeColor = (color: string) => {
+  if (color.startsWith("#")) return color;
+  const m = color.match(/\d+/g);
+  return m
+    ? "#" +
+        m
+          .slice(0, 3)
+          .map((v) => Number(v).toString(16).padStart(2, "0"))
+          .join("")
+    : "#888888";
+};
 /** Brand symbol when there is no logo: fictional demo marks or the initial on an accent disc. */
 function emblem(
   c: CanvasRenderingContext2D,
@@ -210,7 +255,13 @@ export function drawRooftopSign(
   c.textBaseline = "alphabetic";
   if (logo && logo.width / logo.height >= 2.2) {
     const logoH = tagline ? h * 0.6 : h;
-    contain(c, logo, x0, y0, w, logoH);
+    const plate = plateFor(logo, background);
+    if (plate) {
+      c.fillStyle = plate;
+      roundRect(c, x0, y0, w, logoH, logoH * 0.08);
+      c.fill();
+    }
+    contain(c, logo, x0 + w * 0.03, y0 + logoH * 0.08, w * 0.94, logoH * 0.84);
     if (tagline) {
       c.fillStyle = ink;
       c.globalAlpha = 0.82;
@@ -223,9 +274,11 @@ export function drawRooftopSign(
   }
   const icon = h;
   if (logo) {
-    if (ink !== DARK_INK) {
-      // Light tile behind logos on dark signs keeps transparent dark logos readable.
-      c.fillStyle = "#fbf8f0";
+    const plate =
+      plateFor(logo, background) ?? (ink !== DARK_INK ? "#fbf8f0" : null);
+    if (plate) {
+      // A contrasting tile keeps light logos on light signs (and dark on dark) readable.
+      c.fillStyle = plate;
       roundRect(c, x0, y0, icon, icon, icon * 0.08);
       c.fill();
       contain(
@@ -359,10 +412,22 @@ export function drawBrandPanel(
     H = canvas.height;
   c.clearRect(0, 0, W, H);
   if (image) {
-    cover(c, image, 0, 0, W, H);
+    // Promotional art fills the panel unless that would crop more than ~20%; then it is shown
+    // whole on the brand colour instead of losing its edges (and its text).
+    const mismatch = Math.max(
+      image.width / image.height / (W / H),
+      W / H / (image.width / image.height),
+    );
+    if (mismatch <= 1.25) cover(c, image, 0, 0, W, H);
+    else {
+      c.fillStyle = colors.primary;
+      c.fillRect(0, 0, W, H);
+      contain(c, image, 0, 0, W, H);
+    }
     return;
   }
-  const light = luminance(colors.primary) > 0.62;
+  // The plate contrasts with the logo when there is one, otherwise with the brand body.
+  const light = logo ? logoTone(logo) > 0.78 : luminance(colors.primary) > 0.62;
   const plate = light ? "#1c2826" : "#fbf8f1";
   const ink = light
     ? "#fbf8f1"
@@ -395,7 +460,8 @@ export function drawBrandPanel(
     c.fillText(name, left, H / 2 + font * 0.04);
   } else {
     // Otherwise the symbol on top and the name below it, across the full width.
-    const size = Math.min(W - pad * 2, H * 0.5);
+    // Square logos are the panel: as large as the name below still allows.
+    const size = Math.min(W - pad * 2, H * (logo ? 0.62 : 0.5));
     symbol((W - size) / 2, pad * 0.9, size);
     const room = H - pad * 1.6 - size;
     const font = fit(c, name, W - pad * 1.2, Math.round(room * 0.8), 16, "800");

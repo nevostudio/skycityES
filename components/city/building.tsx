@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, memo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { BrandSign } from "./brand-sign";
-import { brandPalette } from "@/lib/brand-theme";
+import { useBrandPalette } from "./use-brand-palette";
 import { districtStyle, districtWall } from "./district-style";
 import { BuildingForm } from "./architecture";
 import { architectureOf } from "@/lib/massing";
@@ -303,7 +303,7 @@ export const Building = memo(function Building({
   // The brand takes over the architecture (colour, silhouette, facade); the district only
   // sets the neutral material. City-owned buildings keep their civic colour.
   const color = muted ? "#d6d8cf" : civic ? p.color : districtWall(p);
-  const brand = useMemo(() => (p.ad ? brandPalette(p.ad) : null), [p.ad]);
+  const { palette: brand } = useBrandPalette(p.ad);
   function enter(e: ThreeEvent<PointerEvent>) {
     e.stopPropagation();
     setHover(true);

@@ -47,6 +47,9 @@ export type Crown =
  * - wrapped: the tower wrapped in the brand colour.
  */
 export type BrandPattern = "rooftop" | "facade" | "billboard" | "wrapped";
+/** Silhouette families shared by every tier (scaled to the tier's height). */
+export type Archetype =
+  "wide" | "block" | "slender" | "stepped" | "crowned" | "singular";
 export type Massing = {
   volumes: Volume[];
   /** The highest volume: the rooftop sign and crown stand on it. */
@@ -59,6 +62,7 @@ export type Massing = {
   /** A vertical brand core running up the front. */
   core: boolean;
   variant: number;
+  archetype: Archetype;
   /** Height the rooftop sign starts at (top of the crown it stands on). */
   roofY: number;
 };
@@ -80,159 +84,162 @@ const V = (
   z = 0,
 ): Volume => ({ y0, y1, w, d, x, z, role });
 type Shape = {
+  archetype: Archetype;
   volumes: Volume[];
   crown: Crown;
   pattern: BrandPattern;
   core?: boolean;
 };
-/** Silhouette catalogue. `h` is the tier height, `g` the ground floor height. */
-const SHAPES: Record<BuildingTier, ((h: number, g: number) => Shape)[]> = {
+type Make = (h: number, g: number) => Shape;
+/**
+ * Reusable silhouettes. `h` is the tier height, `g` the ground floor height. Every volume stays
+ * inside the plot footprint (|x| + w/2 <= 0.5, same for z/d).
+ */
+const ARCHETYPES = {
+  /** Wide and low: the whole footprint under a deep overhanging roof slab. */
+  wide: (): Make => (h) => ({
+    archetype: "wide",
+    volumes: [V(0, h, 1, 0.92, "body")],
+    crown: "slab",
+    pattern: "rooftop",
+  }),
+  /** Medium block with a parapet; a shopfront podium when `podium` is set. */
+  block:
+    (podium = false, pattern: BrandPattern = "facade"): Make =>
+    (h, g) => ({
+      archetype: "block",
+      volumes: podium
+        ? [
+            V(0, Math.min(g, h - 1), 1, 1, "base"),
+            V(Math.min(g, h - 1), h, 0.86, 0.84, "body"),
+          ]
+        : [V(0, h, 0.9, 0.88, "body")],
+      crown: "parapet",
+      pattern,
+    }),
+  /** Slender tower on a full-footprint podium. */
+  slender:
+    (crown: Crown = "cap", core = false): Make =>
+    (h, g) => ({
+      archetype: "slender",
+      volumes: [
+        V(0, g, 1, 1, "base"),
+        V(g, h, 0.72, 0.74, "top", -0.04, -0.03),
+      ],
+      crown,
+      pattern: "wrapped",
+      core,
+    }),
+  /** Set-backs: two or three receding steps. */
+  stepped:
+    (steps: 2 | 3 = 3): Make =>
+    (h, g) => {
+      const a = Math.max(g, h * (steps === 3 ? 0.46 : 0.6));
+      const b = steps === 3 ? Math.max(a + 1, h * 0.76) : h;
+      return {
+        archetype: "stepped",
+        volumes:
+          steps === 3 && b < h
+            ? [
+                V(0, a, 1, 1, "base"),
+                V(a, b, 0.8, 0.8, "body"),
+                V(b, h, 0.58, 0.6, "top"),
+              ]
+            : [V(0, a, 1, 0.96, "base"), V(a, h, 0.76, 0.76, "top")],
+        crown: "parapet",
+        pattern: "rooftop",
+      };
+    },
+  /** A lantern block on the roof with a pronounced crown (cap or spire). */
+  crowned:
+    (crown: Crown = "cap"): Make =>
+    (h) => {
+      const lantern = Math.min(1.2, Math.max(0.8, h * 0.16));
+      return {
+        archetype: "crowned",
+        volumes: [
+          V(0, h - lantern, 0.92, 0.9, "body"),
+          V(h - lantern, h, 0.62, 0.62, "top"),
+        ],
+        crown,
+        pattern: "facade",
+      };
+    },
+  /** Premium forms: twin towers, a cantilevered upper block, or a tower with a side wing. */
+  singular:
+    (form: "twin" | "cantilever" | "wing"): Make =>
+    (h, g) => {
+      if (form === "twin")
+        return {
+          archetype: "singular",
+          volumes: [
+            V(0, g + 1, 1, 1, "base"),
+            V(g + 1, h, 0.42, 0.7, "top", -0.27, 0),
+            V(g + 1, Math.max(g + 2, h * 0.78), 0.42, 0.7, "body", 0.27, 0),
+          ],
+          crown: "cap",
+          pattern: "wrapped",
+        };
+      if (form === "cantilever")
+        return {
+          archetype: "singular",
+          volumes: [
+            V(0, h * 0.56, 0.66, 0.8, "body", -0.17, 0),
+            V(h * 0.56, h, 1, 0.86, "top"),
+          ],
+          crown: "slab",
+          pattern: "rooftop",
+        };
+      return {
+        archetype: "singular",
+        volumes: [
+          V(0, g + 1, 1, 1, "base"),
+          V(g + 1, h * 0.62, 0.32, 0.62, "body", 0.32, 0),
+          V(g + 1, h, 0.62, 0.62, "top", -0.16, 0),
+        ],
+        crown: "slab",
+        pattern: "facade",
+      };
+    },
+};
+const A = ARCHETYPES;
+/**
+ * Silhouette catalogue per tier: STARTER small and simple, PLUS gains height and a clear
+ * top, PRO a proper tower, PREMIUM special volumes, LANDMARK iconic forms.
+ */
+const SHAPES: Record<BuildingTier, Make[]> = {
   STARTER: [
-    (h) => ({
-      volumes: [V(0, h, 0.92, 0.9, "body")],
-      crown: "parapet",
-      pattern: "rooftop",
-    }),
-    (h) => ({
-      volumes: [V(0, h, 1, 0.84, "body")],
-      crown: "slab",
-      pattern: "facade",
-    }),
-    (h) => ({
-      volumes: [V(0, h, 0.8, 0.94, "body")],
-      crown: "block",
-      pattern: "rooftop",
-    }),
-    (h) => ({
-      volumes: [V(0, 1, 1, 1, "base"), V(1, h, 0.86, 0.86, "body")],
-      crown: "parapet",
-      pattern: "billboard",
-    }),
+    A.wide(),
+    A.block(),
+    A.block(true, "rooftop"),
+    A.crowned("parapet"),
   ],
-  PLUS: [
-    (h) => ({
-      volumes: [V(0, h, 0.94, 0.9, "body")],
-      crown: "parapet",
-      pattern: "rooftop",
-    }),
-    (h, g) => ({
-      volumes: [V(0, g, 1, 1, "base"), V(g, h, 0.84, 0.8, "body", 0, -0.06)],
-      crown: "slab",
-      pattern: "facade",
-    }),
-    (h) => ({
-      volumes: [V(0, h, 0.82, 1, "body")],
-      crown: "frame",
-      pattern: "rooftop",
-    }),
-    (h) => ({
-      volumes: [V(0, h - 1, 1, 0.86, "body"), V(h - 1, h, 0.8, 0.8, "top")],
-      crown: "parapet",
-      pattern: "billboard",
-    }),
-  ],
+  PLUS: [A.block(true), A.wide(), A.stepped(2), A.crowned("cap")],
   PRO: [
-    (h) => ({
-      volumes: [V(0, h, 0.94, 0.9, "body")],
-      crown: "parapet",
-      pattern: "rooftop",
-    }),
-    (h, g) => ({
-      volumes: [V(0, g, 1, 1, "base"), V(g, h, 0.82, 0.84, "body")],
-      crown: "slab",
-      pattern: "facade",
-    }),
-    (h) => ({
-      volumes: [V(0, h, 0.8, 0.86, "body")],
-      crown: "spire",
-      pattern: "rooftop",
-      core: true,
-    }),
-    (h) => ({
-      volumes: [V(0, h - 1, 1, 0.82, "body"), V(h - 1, h, 0.78, 0.8, "top")],
-      crown: "stepped",
-      pattern: "billboard",
-    }),
-    (h) => ({
-      volumes: [V(0, h, 0.92, 0.92, "body")],
-      crown: "block",
-      pattern: "facade",
-    }),
+    A.slender("cap"),
+    A.block(true),
+    A.stepped(3),
+    A.crowned("stepped"),
+    A.wide(),
   ],
   PREMIUM: [
-    (h, g) => ({
-      volumes: [V(0, g + 1, 1, 1, "base"), V(g + 1, h, 0.8, 0.8, "top")],
-      crown: "parapet",
-      pattern: "wrapped",
-    }),
-    (h, g) => ({
-      volumes: [V(0, g, 1, 1, "base"), V(g, h, 0.74, 0.72, "top", 0, -0.1)],
-      crown: "slab",
-      pattern: "billboard",
-    }),
-    (h) => ({
-      volumes: [
-        V(0, h - 2, 0.94, 0.92, "body"),
-        V(h - 2, h, 0.76, 0.74, "top"),
-      ],
-      crown: "stepped",
-      pattern: "facade",
-    }),
-    (h, g) => ({
-      volumes: [V(0, g + 1, 0.96, 0.96, "base"), V(g + 1, h, 0.9, 0.66, "top")],
-      crown: "frame",
-      pattern: "facade",
-    }),
-    (h) => ({
-      volumes: [V(0, h, 0.82, 0.82, "body")],
-      crown: "parapet",
-      pattern: "rooftop",
-      core: true,
-    }),
+    A.stepped(3),
+    A.singular("twin"),
+    A.crowned("spire"),
+    A.singular("cantilever"),
+    A.slender("frame", true),
   ],
   LANDMARK: [
-    (h, g) => ({
-      volumes: [V(0, g + 2, 1, 1, "base"), V(g + 2, h, 0.66, 0.66, "top")],
-      crown: "cap",
-      pattern: "wrapped",
-    }),
-    (h, g) => ({
-      volumes: [
-        V(0, g + 1, 1, 1, "base"),
-        V(g + 1, h - 2, 0.74, 0.74, "body"),
-        V(h - 2, h, 0.6, 0.6, "top"),
-      ],
-      crown: "stepped",
-      pattern: "wrapped",
-    }),
-    (h, g) => ({
-      volumes: [V(0, g + 2, 1, 1, "base"), V(g + 2, h, 0.6, 0.6, "top")],
-      crown: "spire",
-      pattern: "wrapped",
-      core: true,
-    }),
-    (h) => ({
-      volumes: [V(0, h, 0.84, 0.8, "top")],
-      crown: "frame",
-      pattern: "wrapped",
-    }),
-    (h, g) => ({
-      volumes: [
-        V(0, g + 1, 1, 1, "base"),
-        V(g + 1, h * 0.62, 0.32, 0.62, "body", 0.32, 0),
-        V(g + 1, h, 0.62, 0.62, "top", -0.16, 0),
-      ],
-      crown: "slab",
-      pattern: "billboard",
-    }),
-    (h, g) => ({
-      volumes: [V(0, g, 1, 1, "base"), V(g, h, 0.78, 0.74, "top")],
-      crown: "slab",
-      pattern: "facade",
-    }),
+    A.slender("cap", true),
+    A.stepped(3),
+    A.singular("twin"),
+    A.crowned("spire"),
+    A.singular("cantilever"),
+    A.singular("wing"),
   ],
   SKYSCRAPER: [
     (h, g) => ({
+      archetype: "slender",
       volumes: [V(0, g + 3, 1, 1, "base"), V(g + 3, h, 0.66, 0.66, "top")],
       crown: "cap",
       pattern: "wrapped",
@@ -276,7 +283,7 @@ export function massing(p: {
     ...v,
     y1: Math.min(v.y1, p.height),
   }));
-  const top = volumes.reduce((a, b) => (b.y1 >= a.y1 ? b : a));
+  const top = volumes.reduce((a, b) => (b.y1 > a.y1 ? b : a));
   return {
     volumes,
     top,
@@ -286,6 +293,7 @@ export function massing(p: {
     pattern: shape.pattern,
     core: !!shape.core,
     variant,
+    archetype: shape.archetype,
     roofY: p.height + (roof === "gable" ? 0 : CROWN_HEIGHT[crown]),
   };
 }

@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit && prettier --check app components hooks lib types tests scripts *.ts",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "db:migrate": "tsx scripts/migrate.ts",
+    "demo:brands": "tsx scripts/demo-brands.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write app components hooks lib types tests scripts *.ts *.json"
   },

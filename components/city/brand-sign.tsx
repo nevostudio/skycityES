@@ -1,18 +1,15 @@
 "use client";
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useSceneMotion } from "./scene-motion";
 import { useCanvasTexture } from "./sign-texture";
 import * as THREE from "three";
 import type { Ad, BuildingTier, PublicProperty } from "@/types";
 import { presenceLevel } from "@/lib/presence";
-import {
-  brandKind,
-  brandPalette,
-  brandTheme,
-  type BrandPalette,
-} from "@/lib/brand-theme";
+import { brandKind, brandTheme, type BrandPalette } from "@/lib/brand-theme";
 import { SIGN_YAW, signSize } from "@/lib/branding";
+import { brandPlan } from "@/lib/brand-plan";
+import { useBrandPalette } from "./use-brand-palette";
 import {
   drawBrandPanel,
   drawRooftopSign,
@@ -263,8 +260,8 @@ function BrandPanel({
       name={`brand-panel-${side ? "side" : "front"}-${p.id}`}
       position={
         side
-          ? [b.x + b.w / 2 + 0.07, y, b.z - offset * faceW]
-          : [b.x + offset * faceW, y, b.z + b.d / 2 + 0.07]
+          ? [b.x + b.w / 2 + 0.14, y, b.z - offset * faceW]
+          : [b.x + offset * faceW, y, b.z + b.d / 2 + 0.14]
       }
       rotation={[0, side ? Math.PI / 2 : 0, 0]}
     >
@@ -319,7 +316,7 @@ function VerticalBanner({
       position={[
         t.x - t.w / 2 + width / 2 + 0.14,
         t.y1 - 0.4 - height / 2,
-        t.z + t.d / 2 + 0.06,
+        t.z + t.d / 2 + 0.12,
       ]}
     >
       {texture && (
@@ -350,7 +347,8 @@ export function BrandSign({
 }) {
   const theme = brandTheme(p.ad),
     kind = brandKind(p.ad);
-  const palette = useMemo(() => brandPalette(p.ad), [p.ad]);
+  const { palette: brand, logo } = useBrandPalette(p.ad);
+  const palette = brand!;
   const motion = useSceneMotion(),
     time = useRef(0),
     neon = useRef<THREE.MeshStandardMaterial>(null);
@@ -369,26 +367,16 @@ export function BrandSign({
     m.volumes
       .filter((v) => v.y1 - Math.max(v.y0, 1.95) >= 1)
       .sort((a, b) => b.y1 - b.y0 - (a.y1 - a.y0))[0] ?? m.top;
-  const banner = !!p.ad.banner;
-  const wantsSide = banner && p.ad.support === "SIDE_BILLBOARD";
   const roofless = m.roof === "gable";
-  // The facade carries the brand. Panel per tier (share of the face, height/width, cap):
-  // STARTER already receives a readable integrated plate. Each paid step grows the surface;
-  // PREMIUM and LANDMARK use tall facade-scale compositions that survive the overview camera.
-  const FRONT: [number, number, number][] = [
-    [0.82, 0.64, 1.55],
-    [0.9, 0.72, 2.1],
-    [0.94, 0.9, 3.1],
-    [0.97, 1.28, 5.2],
-    [0.99, 2.05, 9.5],
-    [0.99, 2.15, 13],
-  ];
-  const [share, ratio, cap] = FRONT[Math.min(level, 5)];
-  const side = level >= 4 || (level >= 2 && (banner || m.variant % 2 === 1));
-  const band = level >= 3;
-  // Every flat-roofed owned building gets the secondary skyline read. Tier sizing keeps the
-  // hierarchy without relying on the sign as the only ownership cue.
-  const rooftop = !roofless;
+  // Which supports carry the brand and how large: see lib/brand-plan.
+  const plan = brandPlan({
+    tier,
+    variant: m.variant,
+    roofless,
+    hasImage: !!p.ad.banner,
+    sideSupport: p.ad.support === "SIDE_BILLBOARD",
+    logoAspect: logo?.aspect,
+  });
   const panel = {
     p,
     palette,
@@ -403,7 +391,7 @@ export function BrandSign({
   });
   return (
     <group name={"branding-" + p.id}>
-      {rooftop && (
+      {plan.rooftop && (
         <RooftopSign
           p={p}
           tier={tier}
@@ -414,24 +402,24 @@ export function BrandSign({
       <BrandPanel
         {...panel}
         side={false}
-        share={band ? Math.min(share, level >= 4 ? 0.76 : 0.7) : share}
-        offset={band ? 0.115 : 0}
-        ratio={ratio}
-        cap={cap}
+        share={plan.front.share}
+        offset={plan.front.offset}
+        ratio={plan.front.ratio}
+        cap={plan.front.cap}
         screen={arch === "leisure"}
-        image={banner && (level >= 3 || !wantsSide)}
+        image={plan.front.content === "image"}
       />
-      {side && (
+      {plan.side && (
         <BrandPanel
           {...panel}
           side
-          share={level >= 4 ? 0.94 : level >= 3 ? 0.86 : 0.78}
-          ratio={level >= 4 ? 2 : level >= 3 ? 1.6 : 1.1}
-          cap={level >= 4 ? 9 : level === 3 ? 5.5 : 3.2}
-          image={wantsSide && level < 3}
+          share={plan.side.share}
+          ratio={plan.side.ratio}
+          cap={plan.side.cap}
+          image={plan.side.content === "image"}
         />
       )}
-      {band && <VerticalBanner p={p} palette={palette} level={level} />}
+      {plan.band && <VerticalBanner p={p} palette={palette} level={level} />}
       {cafe && (
         <>
           <Piece

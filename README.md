@@ -268,3 +268,11 @@ El panel flotante usa `rankBrands` y `latestPurchase` (`lib/city-social.ts`): so
 `CityData.metrics.totalVisits` suma los eventos `city_impression` registrados (una visita por sesión de 30 minutos según la analítica existente). No suma las visitas a edificios. El contador de personas en línea todavía no tiene proveedor: la UI muestra **18 · demo** únicamente en modo demo y **—** en live. Para conectar presencia real, proporcionar `online` y `onlineSource: "live"` en `CityData.metrics`; no requiere cambiar el componente.
 
 El ranking selecciona el edificio a través del flujo de cámara existente y abre su ficha a la derecha. Puede cerrarse y reabrirse; en móvil arranca cerrado y se abre como panel inferior. `tests/e2e/city-social.spec.ts` comprueba navegación y responsive sobre los datos disponibles, sin realizar compras.
+
+## Identidad visual de los edificios de marca
+
+- **Siluetas** (`lib/massing.ts`): seis familias reutilizables (ancho y bajo, bloque, torre esbelta, escalonado, con coronación y singular: torres gemelas, voladizo o ala lateral) repartidas por tier: STARTER 4 variantes, PLUS 4, PRO 5, PREMIUM 5 y LANDMARK 6. Cada solar conserva siempre la misma variante.
+- **Color** (`brandPalette` en `lib/brand-theme.ts`): el color principal cubre casi todo el volumen; el secundario marca zócalo y coronación, y un tono profundo marca marcos y retranqueos. Las marcas muy oscuras reciben marcos y vidrio más claros. Si una marca deja el color por defecto o elige blanco/gris/negro y tiene logo, el edificio toma el color dominante del logo (`lib/logo-info.ts`).
+- **Soportes por tier** (`brandPlan` en `lib/brand-plan.ts`): STARTER una placa en fachada; PLUS cartel superior y panel frontal; PRO cartel y panel frontal (lateral si se pide valla lateral); PREMIUM fachada grande y panel lateral o banda vertical; LANDMARK todo, con cartel iluminado.
+- **Logos e imágenes**: los logos se muestran completos (`contain`) sobre una placa que contrasta con el propio logo; un logo horizontal genera un panel ancho y uno cuadrado un panel grande. Las imágenes promocionales llenan el panel (`cover`) salvo que el recorte supere ~20 %; entonces se muestran completas sobre el color de marca.
+- **Ejemplos**: `npm run demo:brands -- http://localhost:3000` añade diez marcas ficticias variadas a una ciudad demo (solo funciona en modo demo).

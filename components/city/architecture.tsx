@@ -5,7 +5,8 @@ import type { BrandPalette } from "@/lib/brand-theme";
 import { Block } from "./building";
 import { districtStyle } from "./district-style";
 import { architectureOf, massing, type Volume } from "@/lib/massing";
-import { presenceLevel } from "@/lib/presence";
+import { GROUND_FLOOR_HEIGHT, presenceLevel } from "@/lib/presence";
+import { brandPlan } from "@/lib/brand-plan";
 
 /** Pitched roof (Casco Antiguo): a shared triangular prism, scaled per building. */
 const gable = (() => {
@@ -73,12 +74,22 @@ export function BuildingForm({
       : brand.primary;
   };
   const accent = muted ? MUTED : brand ? brand.deep : district.trim;
+  const plan = brandPlan({
+    tier: p.building?.tier ?? "STARTER",
+    variant: m.variant,
+    roofless: m.roof === "gable",
+    hasImage: false,
+    sideSupport: false,
+  });
+  // Contrasting crown from PRO up; a darker brand tone below that.
   const crownColor = muted
     ? MUTED
     : brand
-      ? m.crown === "cap"
-        ? brand.primary
-        : brand.deep
+      ? plan.crownAccent
+        ? brand.secondary
+        : m.crown === "cap"
+          ? brand.primary
+          : brand.deep
       : m.roof === "green"
         ? "#a9c68f"
         : district.roof;
@@ -113,6 +124,36 @@ export function BuildingForm({
           color={colorOf(v)}
         />
       ))}
+      {/* Base accent: a contrasting band over the shopfront (PLUS and up). */}
+      {brand &&
+        !muted &&
+        plan.baseAccent &&
+        footprint
+          .filter((v) => v.y1 > GROUND_FLOOR_HEIGHT + 0.3)
+          .map((v, i) => (
+            <Block
+              key={`base${i}`}
+              position={[v.x * w, GROUND_FLOOR_HEIGHT - 0.08, v.z * d]}
+              scale={[v.w * w + 0.08, 0.16, v.d * d + 0.08]}
+              color={brand.secondary}
+            />
+          ))}
+      {/* Lower towers and wings get their own cap. */}
+      {m.volumes
+        .filter(
+          (v) =>
+            v !== m.top &&
+            v.y0 > 0 &&
+            !m.volumes.some((o) => o !== v && Math.abs(o.y0 - v.y1) < 0.01),
+        )
+        .map((v, i) => (
+          <Block
+            key={`cap${i}`}
+            position={[v.x * w, v.y1 + 0.07, v.z * d]}
+            scale={[v.w * w + 0.12, 0.14, v.d * d + 0.12]}
+            color={crownColor}
+          />
+        ))}
       {/* Ledges where a volume steps back. */}
       {m.volumes
         .filter((v) => v.y0 > 0)

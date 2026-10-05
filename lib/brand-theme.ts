@@ -257,10 +257,37 @@ export type BrandPalette = {
   /** Window glass that reads on the brand colour. */
   window: string;
 };
-/** How a brand colours its building. */
-export function brandPalette(ad: Ad): BrandPalette {
-  // The building wears the brand's own primary colour, the one its logo and panel use.
-  const primary = saturate(normalize(ad.primary));
+/** Colour every new ad starts with (the brand form's default). */
+export const DEFAULT_BRAND_PRIMARY = "#e77d59";
+/** What the logo tells about the brand once it has loaded (see lib/logo-info). */
+export type LogoInfo = {
+  /** Dominant saturated colour of the logo, or null when it is monochrome. */
+  color: string | null;
+  /** Width / height. */
+  aspect: number;
+};
+const isNeutral = (hex: string) => {
+  const [r, g, b] = toRgb(hex);
+  return Math.max(r, g, b) - Math.min(r, g, b) < 24;
+};
+/**
+ * Brands that left the default colour, or chose white/grey/black, take their building colour
+ * from their logo instead (IKEA's blue rather than a white box), so neighbours stay distinct.
+ */
+export const borrowsLogoColor = (ad: Ad) => {
+  if (!ad.logo) return false;
+  const primary = normalize(ad.primary).toLowerCase();
+  return primary === DEFAULT_BRAND_PRIMARY || isNeutral(primary);
+};
+/**
+ * Brand palette for the architecture: the dominant primary, a contrasting secondary for
+ * bands, bases and crowns, a deep tone for frames and glass that reads on the body. Very dark
+ * brands get lighter frames and glass so the volume keeps its edges.
+ */
+export function brandPalette(ad: Ad, logo?: LogoInfo | null): BrandPalette {
+  const source =
+    logo?.color && borrowsLogoColor(ad) ? logo.color : normalize(ad.primary);
+  const primary = saturate(source);
   const own = /^#[0-9a-f]{6}$/i.test(ad.secondary) ? ad.secondary : "#fcf5e9";
   const secondary =
     Math.abs(luminance(own) - luminance(primary)) > 0.3
@@ -269,13 +296,15 @@ export function brandPalette(ad: Ad): BrandPalette {
         ? "#17322a"
         : "#f3eee3";
   const lum = luminance(primary);
+  const rgb = toRgb(primary);
   return {
     primary,
     secondary,
-    deep: toHex(toRgb(primary).map((v) => v * (lum > 0.8 ? 0.8 : 0.62))),
-    tint: toHex(
-      toRgb(primary).map((v, i) => v + ([243, 239, 229][i] - v) * 0.24),
-    ),
+    deep:
+      lum < 0.05
+        ? toHex(rgb.map((v) => v + (255 - v) * 0.3))
+        : toHex(rgb.map((v) => v * (lum > 0.8 ? 0.8 : 0.62))),
+    tint: toHex(rgb.map((v, i) => v + ([243, 239, 229][i] - v) * 0.24)),
     window: lum < 0.12 ? "#c3d3d4" : lum > 0.5 ? "#2a4540" : "#1d3330",
   };
 }
